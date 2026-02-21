@@ -5,11 +5,21 @@ import styles from './Chat.module.css';
 
 const API_BASE = '/api';
 
-// Configure marked for inline rendering
 marked.setOptions({ breaks: true, gfm: true });
 
-function renderMarkdown(text) {
-  return { __html: marked.parse(text) };
+// ── Sub-components ────────────────────────────────────────────────────────
+
+function TypingIndicator() {
+  return (
+    <div className={`${styles.msgRow} ${styles.msgRowAssistant}`}>
+      <div className={styles.avatar}>K</div>
+      <div className={`${styles.bubble} ${styles.bubbleAssistant}`}>
+        <div className={styles.typing}>
+          <span /><span /><span />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function Message({ msg, isStreaming }) {
@@ -19,16 +29,21 @@ function Message({ msg, isStreaming }) {
       {!isUser && <div className={styles.avatar}>K</div>}
       <div className={`${styles.bubble} ${isUser ? styles.bubbleUser : styles.bubbleAssistant}`}>
         <div className={styles.bubbleText}>
-          {isUser ? (
-            msg.content
-          ) : (
-            <div className={styles.markdownContent} dangerouslySetInnerHTML={renderMarkdown(msg.content)} />
-          )}
+          {isUser
+            ? msg.content
+            : <div
+                className={styles.markdownContent}
+                dangerouslySetInnerHTML={{ __html: marked.parse(msg.content) }}
+              />
+          }
           {isStreaming && <span className={styles.cursor} />}
         </div>
         {msg.created_at && (
           <div className={styles.bubbleTime}>
-            {new Date(msg.created_at + 'Z').toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+            {new Date(msg.created_at + 'Z').toLocaleTimeString('es-ES', {
+              hour: '2-digit',
+              minute: '2-digit',
+            })}
           </div>
         )}
       </div>
@@ -36,105 +51,69 @@ function Message({ msg, isStreaming }) {
   );
 }
 
-export default function Chat() {
-  const [messages, setMessages]       = useState([]);
-  const [input, setInput]             = useState('');
-  const [loading, setLoading]         = useState(true);
-  const [streaming, setStreaming]     = useState(false);
-  const [streamingText, setStreamingText] = useState('');
-  const [error, setError]             = useState(null);
-  const bottomRef = useRef(null);
-  const inputRef  = useRef(null);
-  const abortRef  = useRef(null);
+// ── Main component ────────────────────────────────────────────────────────
 
-  const scrollToBottom = useCallback((smooth = true) => {
-    bottomRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'instant' });
+export default function Chat() {
+  const [messages, setMessages]         = useState([]);
+  const [input, setInput]               = useState('');
+  const [loading, setLoading]           = useState(true);
+  const [streaming, setStreaming]       = useState(false);
+  const [streamingText, setStreamingText] = useState('');
+  const [error, setError]               = useState(null);
+
+  const bottomRef  = useRef(null);
+  const inputRef   = useRef(null);
+
+  const scrollToBottom = useCallback(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  // Load history
+  // Load history on mount
   useEffect(() => {
     const token = getToken();
-    fetch(`${API_BASE}/chat/history`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    fetch(`${API_BASE}/chat/history`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(data => {
         setMessages(Array.isArray(data) ? data : []);
         setLoading(false);
-        setTimeout(() => scrollToBottom(false), 50);
+        // Instant scroll on first load (no animation)
+        setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'instant' }), 50);
       })
       .catch(err => {
         setError(err.message);
         setLoading(false);
       });
-  }, [scrollToBottom]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Unified scroll effect for all cases
+  // Scroll to bottom whenever messages or streaming state changes
   useEffect(() => {
     scrollToBottom();
-  }, [messages.length, streaming, scrollToBottom]);
+  }, [messages.length, streaming, streamingText, scrollToBottom]);
 
-  // Handle mobile keyboard with visualViewport API
-  useEffect(() => {
-    const wrapper = document.querySelector('[data-chat-wrapper]');
-    if (!wrapper) return;
-
-    const NAV_HEIGHT = 64;
-
-    const updateLayout = () => {
-      const vv = window.visualViewport;
-      if (!vv) return;
-      // La diferencia entre window.innerHeight y vv.height es la altura del teclado
-      const keyboardHeight = window.innerHeight - vv.height - vv.offsetTop;
-      const bottom = Math.max(NAV_HEIGHT, keyboardHeight + NAV_HEIGHT);
-      wrapper.style.bottom = `${bottom}px`;
-    };
-
-    const vv = window.visualViewport;
-    if (vv) {
-      vv.addEventListener('resize', updateLayout);
-      vv.addEventListener('scroll', updateLayout);
-      updateLayout();
-    }
-
-    return () => {
-      if (vv) {
-        vv.removeEventListener('resize', updateLayout);
-        vv.removeEventListener('scroll', updateLayout);
-      }
-    };
-  }, []);
-
+  // Send a message — triggers SSE stream
   const sendMessage = useCallback(async () => {
     const text = input.trim();
     if (!text || streaming) return;
 
     setInput('');
+    // Reset textarea height
+    if (inputRef.current) inputRef.current.style.height = 'auto';
     setStreaming(true);
     setStreamingText('');
     setError(null);
-    
-    // Bug 2: Scroll immediately before fetch
-    setTimeout(() => scrollToBottom(false), 50);
 
     const token = getToken();
-    const controller = new AbortController();
-    abortRef.current = controller;
 
     try {
       const res = await fetch(`${API_BASE}/chat/send`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ message: text }),
-        signal: controller.signal,
       });
 
-      if (!res.ok) throw new Error('Error al enviar mensaje');
+      if (!res.ok) throw new Error(`Error ${res.status}`);
 
-      const reader = res.body.getReader();
+      const reader  = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
       let accumulated = '';
@@ -145,40 +124,32 @@ export default function Chat() {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
-        buffer = lines.pop();
+        buffer = lines.pop(); // keep incomplete line
 
         for (const line of lines) {
           if (!line.startsWith('data:')) continue;
           const raw = line.slice(5).trim();
-          try {
-            const event = JSON.parse(raw);
 
-            if (event.type === 'user_message') {
-              setMessages(prev => [...prev, event.message]);
-            } else if (event.type === 'delta') {
-              accumulated += event.content;
-              setStreamingText(accumulated);
-              // Bug 2: Scroll every ~30 chars or if short
-              if (accumulated.length % 30 === 0 || accumulated.length < 50) {
-                scrollToBottom();
-              }
-            } else if (event.type === 'done') {
-              setMessages(prev => [...prev, event.message]);
-              setStreamingText('');
-              setStreaming(false);
-              inputRef.current?.focus();
-            } else if (event.type === 'error') {
-              throw new Error(event.error);
-            }
-          } catch {
-            // ignore parse errors
+          let event;
+          try { event = JSON.parse(raw); } catch { continue; }
+
+          if (event.type === 'user_message') {
+            setMessages(prev => [...prev, event.message]);
+          } else if (event.type === 'delta') {
+            accumulated += event.content;
+            setStreamingText(accumulated);
+          } else if (event.type === 'done') {
+            setMessages(prev => [...prev, event.message]);
+            setStreamingText('');
+            setStreaming(false);
+            inputRef.current?.focus();
+          } else if (event.type === 'error') {
+            throw new Error(event.error);
           }
         }
       }
     } catch (err) {
-      if (err.name !== 'AbortError') {
-        setError(err.message);
-      }
+      setError(err.message);
       setStreaming(false);
       setStreamingText('');
     }
@@ -193,13 +164,12 @@ export default function Chat() {
 
   const handleInputChange = (e) => {
     setInput(e.target.value);
-    // Auto-resize
     e.target.style.height = 'auto';
     e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
   };
 
   const clearHistory = async () => {
-    if (!window.confirm('¿Borrar todo el historial del chat?')) return;
+    if (!window.confirm('¿Borrar todo el historial?')) return;
     const token = getToken();
     await fetch(`${API_BASE}/chat/history`, {
       method: 'DELETE',
@@ -208,18 +178,16 @@ export default function Chat() {
     setMessages([]);
   };
 
+  // ── Render ──────────────────────────────────────────────────────────────
+
   if (loading) {
-    return (
-      <div className={styles.centered}>
-        <div className={styles.spinner} />
-      </div>
-    );
+    return <div className={styles.centered}><div className={styles.spinner} /></div>;
   }
 
   return (
-    <div className={styles.wrapper} data-chat-wrapper>
+    <div className={styles.wrapper}>
       {/* Messages */}
-      <div className={styles.messages} data-chat-messages>
+      <div className={styles.messages}>
         {messages.length === 0 && !streaming && (
           <div className={styles.empty}>
             <p className={styles.emptyTitle}>Kai está listo</p>
@@ -235,28 +203,14 @@ export default function Chat() {
           </div>
         )}
 
-        {messages.map(msg => (
-          <Message key={msg.id} msg={msg} />
-        ))}
+        {messages.map(msg => <Message key={msg.id} msg={msg} />)}
 
-        {/* Streaming message */}
+        {streaming && !streamingText && <TypingIndicator />}
         {streaming && streamingText && (
           <Message
             msg={{ role: 'assistant', content: streamingText, created_at: null }}
             isStreaming
           />
-        )}
-
-        {/* Typing indicator (before first token arrives) */}
-        {streaming && !streamingText && (
-          <div className={`${styles.msgRow} ${styles.msgRowAssistant}`}>
-            <div className={styles.avatar}>K</div>
-            <div className={`${styles.bubble} ${styles.bubbleAssistant}`}>
-              <div className={styles.typing}>
-                <span /><span /><span />
-              </div>
-            </div>
-          </div>
         )}
 
         {error && (

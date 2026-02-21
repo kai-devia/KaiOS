@@ -1,46 +1,43 @@
-/* ── Layout ──────────────────────────────────────────────────────────────── */
+/*
+ * Chat layout strategy:
+ *
+ * Mobile: `height: calc(100dvh - header - bottomnav)`
+ *   dvh = dynamic viewport height — se reduce automáticamente cuando el
+ *   teclado virtual aparece. Sin JS, sin position:fixed, sin trucos.
+ *
+ * Desktop: height: 100% (el layout flex del padre proporciona la altura)
+ */
+
+/* ── Wrapper ─────────────────────────────────────────────────────────────── */
 .wrapper {
-  position: fixed;
-  top: var(--header-height, 56px); /* debajo del header global */
-  left: 0;
-  right: 0;
-  bottom: 64px; /* height del BottomNav */
   display: flex;
   flex-direction: column;
-  background: var(--bg-base);
   overflow: hidden;
+  background: var(--bg-base);
+
+  /* Mobile: altura exacta del espacio disponible entre header y bottomnav */
+  height: calc(100dvh - var(--header-height, 56px) - 64px);
 }
 
-/* ── Clear history row ───────────────────────────────────────────────────── */
-.clearRow {
-  display: flex;
-  justify-content: center;
-  padding: 4px 0 8px;
+@media (min-width: 769px) {
+  .wrapper {
+    height: 100%;
+  }
 }
 
-.clearBtn {
-  background: none;
-  border: none;
-  font-size: 0.72rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  opacity: 0.5;
-  transition: opacity var(--transition), color var(--transition);
-  padding: 4px 8px;
-}
-.clearBtn:hover { opacity: 1; color: var(--danger); }
-
-/* ── Messages ────────────────────────────────────────────────────────────── */
+/* ── Messages (scrollable) ───────────────────────────────────────────────── */
 .messages {
   flex: 1;
+  min-height: 0; /* necesario para que flex + overflow funcione */
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 16px 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  -webkit-overflow-scrolling: touch;
 }
 
+/* ── Empty state ─────────────────────────────────────────────────────────── */
 .empty {
   flex: 1;
   display: flex;
@@ -54,6 +51,24 @@
 .emptyTitle { font-size: 1rem; font-weight: 600; margin: 0; }
 .emptySub   { font-size: 0.82rem; margin: 0; }
 
+/* ── Limpiar historial ───────────────────────────────────────────────────── */
+.clearRow {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 8px;
+}
+.clearBtn {
+  background: none;
+  border: none;
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0.45;
+  padding: 4px 8px;
+  transition: opacity var(--transition), color var(--transition);
+}
+.clearBtn:hover { opacity: 1; color: var(--danger); }
+
 /* ── Message rows ────────────────────────────────────────────────────────── */
 .msgRow {
   display: flex;
@@ -61,7 +76,6 @@
   gap: 8px;
   max-width: 88%;
 }
-
 .msgRowUser      { align-self: flex-end; flex-direction: row-reverse; }
 .msgRowAssistant { align-self: flex-start; }
 
@@ -88,32 +102,49 @@
   max-width: 100%;
   min-width: 0;
 }
-
 .bubbleUser {
   background: var(--accent);
   color: #000;
   border-radius: 16px 16px 4px 16px;
 }
-
 .bubbleAssistant {
   background: var(--bg-card);
   border: 1px solid var(--border);
   color: var(--text-primary);
   border-radius: 16px 16px 16px 4px;
 }
-
 .bubbleText {
   font-size: 0.9rem;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
 }
-
 .bubbleTime {
   font-size: 0.62rem;
   opacity: 0.6;
   margin-top: 4px;
   text-align: right;
+}
+
+/* ── Typing indicator ────────────────────────────────────────────────────── */
+.typing {
+  display: flex;
+  gap: 5px;
+  padding: 4px 2px;
+  align-items: center;
+}
+.typing span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-secondary);
+  animation: bounce 1.2s ease-in-out infinite;
+}
+.typing span:nth-child(2) { animation-delay: 0.2s; }
+.typing span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
+  40%           { transform: scale(1);   opacity: 1; }
 }
 
 /* ── Streaming cursor ────────────────────────────────────────────────────── */
@@ -126,36 +157,57 @@
   vertical-align: text-bottom;
   animation: blink 0.8s step-end infinite;
 }
-
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50%       { opacity: 0; }
 }
 
-/* ── Typing indicator ────────────────────────────────────────────────────── */
-.typing {
+/* ── Input area (always at bottom, never scrolls away) ───────────────────── */
+.inputArea {
+  flex-shrink: 0;
   display: flex;
-  gap: 5px;
-  padding: 4px 2px;
-  align-items: center;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
 }
-
-.typing span {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--text-secondary);
-  animation: bounce 1.2s ease-in-out infinite;
+.input {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  color: var(--text-primary);
+  font-size: 1rem; /* 1rem evita zoom automático en iOS */
+  font-family: inherit;
+  padding: 10px 16px;
+  resize: none;
+  max-height: 120px;
+  overflow-y: auto;
+  line-height: 1.4;
+  transition: border-color var(--transition);
+  -webkit-appearance: none;
 }
-.typing span:nth-child(2) { animation-delay: 0.2s; }
-.typing span:nth-child(3) { animation-delay: 0.4s; }
+.input:focus     { outline: none; border-color: var(--accent); }
+.input:disabled  { opacity: 0.5; }
+.input::placeholder { color: var(--text-secondary); }
 
-@keyframes bounce {
-  0%, 80%, 100% { transform: scale(0.7); opacity: 0.5; }
-  40%           { transform: scale(1);   opacity: 1; }
+.sendBtn {
+  flex-shrink: 0;
+  background: var(--accent);
+  border: none;
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: #000;
+  cursor: pointer;
+  transition: background var(--transition), opacity var(--transition);
 }
+.sendBtn:hover:not(:disabled) { background: var(--accent-hover); }
+.sendBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ── Error ───────────────────────────────────────────────────────────────── */
+/* ── Error banner ────────────────────────────────────────────────────────── */
 .errorBanner {
   background: rgba(239, 68, 68, 0.12);
   border: 1px solid rgba(239, 68, 68, 0.3);
@@ -174,60 +226,13 @@
   font-size: 0.82rem;
 }
 
-/* ── Input area ──────────────────────────────────────────────────────────── */
-.inputArea {
-  display: flex;
-  align-items: flex-end;
-  gap: 8px;
-  padding: 10px 12px;
-  border-top: 1px solid var(--border);
-  background: var(--bg-surface);
-  flex-shrink: 0;
-}
-
-.input {
-  flex: 1;
-  background: var(--bg-card);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  color: var(--text-primary);
-  font-size: 0.95rem;
-  font-family: inherit;
-  padding: 10px 16px;
-  resize: none;
-  max-height: 120px;
-  overflow-y: auto;
-  line-height: 1.4;
-  transition: border-color var(--transition);
-  -webkit-appearance: none;
-}
-.input:focus { outline: none; border-color: var(--accent); }
-.input:disabled { opacity: 0.5; }
-.input::placeholder { color: var(--text-secondary); }
-
-.sendBtn {
-  background: var(--accent);
-  border: none;
-  border-radius: 20px;
-  padding: 10px 20px;
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: #000;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background var(--transition), opacity var(--transition);
-}
-.sendBtn:hover:not(:disabled) { background: var(--accent-hover); }
-.sendBtn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-/* ── States ──────────────────────────────────────────────────────────────── */
+/* ── Loading spinner ─────────────────────────────────────────────────────── */
 .centered {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100%;
 }
-
 .spinner {
   width: 28px;
   height: 28px;
@@ -238,19 +243,17 @@
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Markdown rendering ──────────────────────────────────────────────────── */
-.markdownContent p {
-  margin: 0 0 8px;
-}
-.markdownContent p:last-child {
-  margin-bottom: 0;
-}
-.markdownContent strong {
-  font-weight: 700;
-}
-.markdownContent em {
-  font-style: italic;
-}
+/* ── Markdown ────────────────────────────────────────────────────────────── */
+.markdownContent p              { margin: 0 0 8px; }
+.markdownContent p:last-child   { margin-bottom: 0; }
+.markdownContent strong         { font-weight: 700; }
+.markdownContent em             { font-style: italic; }
+.markdownContent ul,
+.markdownContent ol             { margin: 4px 0; padding-left: 20px; }
+.markdownContent li             { margin: 2px 0; }
+.markdownContent h1,
+.markdownContent h2,
+.markdownContent h3             { margin: 8px 0 4px; font-size: 1em; font-weight: 700; }
 .markdownContent code {
   background: rgba(0,0,0,0.2);
   border-radius: 3px;
@@ -265,34 +268,4 @@
   overflow-x: auto;
   margin: 6px 0;
 }
-.markdownContent pre code {
-  background: none;
-  padding: 0;
-}
-.markdownContent ul,
-.markdownContent ol {
-  margin: 4px 0;
-  padding-left: 20px;
-}
-.markdownContent li {
-  margin: 2px 0;
-}
-.markdownContent h1,
-.markdownContent h2,
-.markdownContent h3 {
-  margin: 8px 0 4px;
-  font-size: 1em;
-  font-weight: 700;
-}
-
-/* ── Desktop layout ──────────────────────────────────────────────────────── */
-@media (min-width: 769px) {
-  .wrapper {
-    position: relative;
-    bottom: auto;
-    top: auto;
-    left: auto;
-    right: auto;
-    height: 100%;
-  }
-}
+.markdownContent pre code { background: none; padding: 0; }
