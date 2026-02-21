@@ -60,6 +60,7 @@ export default function Chat() {
   const inputRef     = useRef(null);
   const queueRef     = useRef([]);
   const busyRef      = useRef(false);
+  const abortRef     = useRef(null); // AbortController del stream actual
 
   // ── Scroll ───────────────────────────────────────────────────────────────
   const scrollToBottom = useCallback(() => {
@@ -97,25 +98,29 @@ export default function Chat() {
 
     busyRef.current = true;
 
-    // Combinar todos los mensajes pendientes en una sola request
-    // Si el usuario envió una corrección mientras pensaba, se analiza todo junto
-    const pending = [...queueRef.current];
+    // Tomar todos los pendientes y combinarlos
+    const batch = [...queueRef.current];
     queueRef.current = [];
     setPending(0);
 
-    const text = pending.length === 1
-      ? pending[0]
-      : pending.join('\n\n'); // combinar con separación clara
+    const text = batch.join('\n\n');
+
+    // AbortController para cancelar si llega un mensaje nuevo
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     setStreaming(true);
     setStreamText('');
     setError(null);
+
+    let aborted = false;
 
     try {
       const res = await fetch(`${API_BASE}/chat/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
         body: JSON.stringify({ message: text }),
+        signal: controller.signal,
       });
 
       if (!res.ok) throw new Error(`Error ${res.status}`);
@@ -137,7 +142,6 @@ export default function Chat() {
           let ev;
           try { ev = JSON.parse(line.slice(5).trim()); } catch { continue; }
 
-          // 'user_message' se ignora — ya está en el chat por el optimistic update
           if (ev.type === 'delta') {
             accumulated += ev.content;
             setStreamText(accumulated);
@@ -151,11 +155,21 @@ export default function Chat() {
         }
       }
     } catch (err) {
-      setError(err.message);
+      if (err.name === 'AbortError') {
+        // Cancelado por nuevo mensaje — volver a encolar el batch original
+        // más cualquier mensaje nuevo que llegó mientras procesaba
+        queueRef.current = [...batch, ...queueRef.current];
+        setPending(queueRef.current.length);
+        aborted = true;
+      } else {
+        setError(err.message);
+      }
       setStreaming(false);
       setStreamText('');
     } finally {
+      abortRef.current = null;
       busyRef.current = false;
+      // Si fue abortado o hay nuevos mensajes, procesar todo combinado
       if (queueRef.current.length > 0) {
         processNext();
       }
@@ -181,7 +195,10 @@ export default function Chat() {
     queueRef.current.push(text);
     setPending(queueRef.current.length);
 
-    if (!busyRef.current) {
+    if (busyRef.current) {
+      // Estoy procesando algo — cancelar y releer todo combinado
+      abortRef.current?.abort();
+    } else {
       processNext();
     }
   }, [input, processNext]);
