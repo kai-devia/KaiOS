@@ -92,15 +92,20 @@ router.delete('/history', (req, res) => {
 });
 
 // ── Helper: Stream message to OpenClaw via SSE ──────────────────────────
+// ── Helper: Sanitize history — removes empty/null messages that break OpenClaw ──
+function sanitizeHistory(history) {
+  return history
+    .filter(m => m.content && String(m.content).trim().length > 0)
+    .map(m => ({ role: m.role, content: m.content }));
+}
+
 async function streamToOpenClaw(message, res, history = [], sessionUser = SESSION_USER) {
   // System prompt built fresh each request — reflects latest MEMORY.md, daily notes, etc.
   const systemPrompt = buildSystemPrompt();
 
-  // Build messages array: system + history + current user message
-  const historyMessages = history.map(m => ({
-    role: m.role,
-    content: m.content,
-  }));
+  // Build messages array: system + sanitized history + current user message
+  // Filter out empty messages to avoid breaking OpenClaw
+  const historyMessages = sanitizeHistory(history);
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -112,7 +117,6 @@ async function streamToOpenClaw(message, res, history = [], sessionUser = SESSIO
     model: 'openclaw',
     messages,
     stream: true,
-    user: sessionUser,
   });
 
   const options = {
@@ -147,11 +151,16 @@ async function streamToOpenClaw(message, res, history = [], sessionUser = SESSIO
           if (!line.startsWith('data:')) continue;
           const raw = line.slice(5).trim();
           if (raw === '[DONE]') {
-            const assistantMsg = db.prepare(
-              "INSERT INTO chat_messages (role, content) VALUES ('assistant', ?) RETURNING *"
-            ).get(assistantText);
-            broadcast({ type: 'chat_message', message: assistantMsg });
-            res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
+            if (assistantText && !res.writableEnded) {
+              const assistantMsg = db.prepare(
+                "INSERT INTO chat_messages (role, content) VALUES ('assistant', ?) RETURNING *"
+              ).get(assistantText);
+              broadcast({ type: 'chat_message', message: assistantMsg });
+              res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
+            } else if (!res.writableEnded) {
+              console.error('[chat] [DONE] received but assistantText is empty — not saving to DB');
+              res.write(`data: ${JSON.stringify({ type: 'error', error: 'Sin respuesta del modelo' })}\n\n`);
+            }
             res.end();
             resolve();
             return;
@@ -176,6 +185,8 @@ async function streamToOpenClaw(message, res, history = [], sessionUser = SESSIO
           ).get(assistantText);
           broadcast({ type: 'chat_message', message: assistantMsg });
           res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
+          res.end();
+        } else if (!res.writableEnded) {
           res.end();
         }
         resolve();
@@ -397,10 +408,7 @@ router.post('/send-image', upload.single('image'), async (req, res) => {
 async function streamWithContent(userContent, res, history = []) {
   const systemPrompt = buildSystemPrompt();
 
-  const historyMessages = history.map(m => ({
-    role: m.role,
-    content: m.content,
-  }));
+  const historyMessages = sanitizeHistory(history);
 
   const messages = [
     { role: 'system', content: systemPrompt },
@@ -412,7 +420,6 @@ async function streamWithContent(userContent, res, history = []) {
     model: 'openclaw',
     messages,
     stream: true,
-    user: SESSION_USER,
   });
 
   const options = {
@@ -447,11 +454,16 @@ async function streamWithContent(userContent, res, history = []) {
           if (!line.startsWith('data:')) continue;
           const raw = line.slice(5).trim();
           if (raw === '[DONE]') {
-            const assistantMsg = db.prepare(
-              "INSERT INTO chat_messages (role, content) VALUES ('assistant', ?) RETURNING *"
-            ).get(assistantText);
-            broadcast({ type: 'chat_message', message: assistantMsg });
-            res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
+            if (assistantText && !res.writableEnded) {
+              const assistantMsg = db.prepare(
+                "INSERT INTO chat_messages (role, content) VALUES ('assistant', ?) RETURNING *"
+              ).get(assistantText);
+              broadcast({ type: 'chat_message', message: assistantMsg });
+              res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
+            } else if (!res.writableEnded) {
+              console.error('[chat/image] [DONE] received but assistantText is empty — not saving to DB');
+              res.write(`data: ${JSON.stringify({ type: 'error', error: 'Sin respuesta del modelo' })}\n\n`);
+            }
             res.end();
             resolve();
             return;
@@ -474,6 +486,8 @@ async function streamWithContent(userContent, res, history = []) {
           ).get(assistantText);
           broadcast({ type: 'chat_message', message: assistantMsg });
           res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
+          res.end();
+        } else if (!res.writableEnded) {
           res.end();
         }
         resolve();
