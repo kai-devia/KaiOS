@@ -1,139 +1,130 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { startAuthentication } from '@simplewebauthn/browser';
-import { useAuth } from '../../hooks/useAuth';
-import { webauthnLoginStart, webauthnLoginFinish, setToken } from '../../api/client';
+import { requestOtp, verifyOtp, setToken } from '../../api/client';
 import styles from './Login.module.css';
 
+/**
+ * Login page — OTP via Telegram
+ *
+ * Flow:
+ *  1. User clicks "Enviar código a Telegram"
+ *  2. Backend sends a 6-digit OTP to Guille's Telegram
+ *  3. User enters the code and clicks "Verificar"
+ *  4. On success → JWT saved → redirect to app
+ */
 export default function Login() {
-  const [user, setUser] = useState('');
-  const [password, setPassword] = useState('');
-  const [biometricLoading, setBiometricLoading] = useState(false);
-  const [biometricError, setBiometricError] = useState(null);
-  const [webauthnSupported, setWebauthnSupported] = useState(false);
-  const { login, loading, error } = useAuth();
+  const [step, setStep] = useState('request'); // 'request' | 'verify'
+  const [code, setCode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Check if WebAuthn is supported by the browser
-    if (
-      window.PublicKeyCredential &&
-      typeof window.PublicKeyCredential === 'function'
-    ) {
-      setWebauthnSupported(true);
-    }
-  }, []);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const success = await login(user, password);
-    if (success) {
-      navigate('/');
+  // ─── Step 1: Request OTP ────────────────────────────────────────────────
+  const handleRequestOtp = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await requestOtp();
+      setStep('verify');
+      setSuccess('Código enviado a Telegram ✅');
+    } catch (err) {
+      setError(err.message || 'No se pudo enviar el código. ¿Está Telegram disponible?');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleBiometricLogin = async () => {
-    setBiometricLoading(true);
-    setBiometricError(null);
-
-    try {
-      // Step 1: Get authentication options from server
-      const options = await webauthnLoginStart();
-
-      if (!options.hasCredentials) {
-        setBiometricError('No tienes huella registrada. Entra con contraseña y regístrala desde la app.');
-        return;
-      }
-
-      // Step 2: Trigger browser biometric prompt
-      let assertion;
-      try {
-        assertion = await startAuthentication(options);
-      } catch (authErr) {
-        if (authErr.name === 'NotAllowedError') {
-          setBiometricError('Autenticación cancelada o no autorizada.');
-        } else {
-          setBiometricError('Error con el sensor biométrico: ' + authErr.message);
-        }
-        return;
-      }
-
-      // Step 3: Verify with server and get JWT
-      const result = await webauthnLoginFinish(assertion);
-
-      if (result.token) {
-        setToken(result.token);
-        navigate('/');
-      } else {
-        setBiometricError('No se recibió token del servidor.');
-      }
-    } catch (err) {
-      setBiometricError(err.message || 'Error de autenticación biométrica');
-    } finally {
-      setBiometricLoading(false);
+  // ─── Step 2: Verify OTP ─────────────────────────────────────────────────
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    if (code.length !== 6) {
+      setError('Introduce los 6 dígitos del código');
+      return;
     }
+    setLoading(true);
+    setError(null);
+    try {
+      const { token } = await verifyOtp(code);
+      setToken(token);
+      navigate('/');
+    } catch (err) {
+      setError(err.message || 'Código incorrecto o expirado');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ─── Resend OTP ─────────────────────────────────────────────────────────
+  const handleResend = async () => {
+    setCode('');
+    setError(null);
+    setSuccess(null);
+    await handleRequestOtp();
   };
 
   return (
     <div className={styles.container}>
-      <form className={styles.form} onSubmit={handleSubmit}>
+      <div className={styles.card}>
         <div className={styles.logo}>🧠</div>
         <h1 className={styles.title}>KAI DOC</h1>
         <p className={styles.subtitle}>Ventana a la mente de Kai</p>
 
         {error && <div className={styles.error}>{error}</div>}
+        {success && step === 'verify' && (
+          <div className={styles.successMsg}>{success}</div>
+        )}
 
-        <div className={styles.field}>
-          <label htmlFor="user">Usuario</label>
-          <input
-            id="user"
-            type="text"
-            value={user}
-            onChange={(e) => setUser(e.target.value)}
-            placeholder="Usuario"
-            autoComplete="username"
-            required
-          />
-        </div>
+        {/* ── Step 1: Send code ── */}
+        {step === 'request' && (
+          <button
+            className={styles.primaryButton}
+            onClick={handleRequestOtp}
+            disabled={loading}
+          >
+            {loading ? '⏳ Enviando...' : '📱 Enviar código a Telegram'}
+          </button>
+        )}
 
-        <div className={styles.field}>
-          <label htmlFor="password">Contraseña</label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Contraseña"
-            autoComplete="current-password"
-            required
-          />
-        </div>
-
-        <button type="submit" className={styles.button} disabled={loading}>
-          {loading ? 'Entrando...' : 'Entrar'}
-        </button>
-
-        {webauthnSupported && (
-          <>
-            <div className={styles.divider}>
-              <span>o</span>
+        {/* ── Step 2: Enter code ── */}
+        {step === 'verify' && (
+          <form onSubmit={handleVerifyOtp} className={styles.form}>
+            <div className={styles.field}>
+              <label htmlFor="otp-code">Código de 6 dígitos</label>
+              <input
+                id="otp-code"
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={6}
+                autoComplete="one-time-code"
+                autoFocus
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
+                placeholder="123456"
+                className={styles.codeInput}
+              />
             </div>
 
-            {biometricError && (
-              <div className={styles.error}>{biometricError}</div>
-            )}
+            <button
+              type="submit"
+              className={styles.primaryButton}
+              disabled={loading || code.length !== 6}
+            >
+              {loading ? '⏳ Verificando...' : '✅ Verificar'}
+            </button>
 
             <button
               type="button"
-              className={styles.biometricButton}
-              onClick={handleBiometricLogin}
-              disabled={biometricLoading}
+              className={styles.resendLink}
+              onClick={handleResend}
+              disabled={loading}
             >
-              {biometricLoading ? '⏳ Verificando...' : '🔐 Entrar con huella'}
+              Reenviar código
             </button>
-          </>
+          </form>
         )}
-      </form>
+      </div>
     </div>
   );
 }

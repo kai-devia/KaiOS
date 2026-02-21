@@ -48,23 +48,25 @@
 .actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
   margin-left: auto;
 }
 
-.biometricBtn {
+.logoutBtn {
   background: none;
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 6px 10px;
-  font-size: 1rem;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color var(--transition), background var(--transition);
-  line-height: 1;
+  transition: border-color var(--transition), color var(--transition), background var(--transition);
+  line-height: 1.4;
 }
 
-.biometricBtn:hover {
-  border-color: var(--accent);
+.logoutBtn:hover {
+  border-color: var(--danger, #e53e3e);
+  color: var(--danger, #e53e3e);
   background: var(--bg-base);
 }
 
@@ -72,7 +74,7 @@
   .menuButton {
     display: flex;
   }
-  
+
   .header {
     padding: 0 16px;
   }

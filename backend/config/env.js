@@ -8,7 +8,7 @@ try {
   // .env not required in Docker (env vars come from compose)
 }
 
-const requiredVars = ['JWT_SECRET', 'AUTH_USER', 'AUTH_PASS', 'WORKSPACE_ROOT'];
+const requiredVars = ['JWT_SECRET', 'WORKSPACE_ROOT'];
 
 for (const varName of requiredVars) {
   if (!process.env[varName]) {
@@ -19,9 +19,9 @@ for (const varName of requiredVars) {
 
 module.exports = {
   jwtSecret: process.env.JWT_SECRET,
-  authUser: process.env.AUTH_USER,
-  authPass: process.env.AUTH_PASS,
   port: parseInt(process.env.PORT, 10) || 3001,
   workspaceRoot: process.env.WORKSPACE_ROOT,
-  jwtExpiry: '30d',
+  jwtExpiry: '365d',
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,
+  telegramChatId: process.env.TELEGRAM_CHAT_ID || '8314284665',
 };

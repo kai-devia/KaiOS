@@ -7,19 +7,22 @@
   background: var(--bg-base);
 }
 
-.form {
+.card {
   width: 100%;
   max-width: 360px;
-  padding: 40px;
+  padding: 48px 40px 40px;
   background: var(--bg-surface);
   border-radius: var(--radius-lg);
   border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .logo {
   font-size: 64px;
-  text-align: center;
   margin-bottom: 8px;
+  line-height: 1;
 }
 
 .title {
@@ -34,19 +37,45 @@
   text-align: center;
   color: var(--text-secondary);
   font-size: 0.9rem;
-  margin-bottom: 32px;
+  margin-bottom: 36px;
 }
 
+/* ── Messages ── */
+
 .error {
+  width: 100%;
   background: var(--danger);
   color: #fff;
   padding: 10px 14px;
   border-radius: var(--radius);
   font-size: 0.9rem;
   margin-bottom: 20px;
+  text-align: center;
+}
+
+.successMsg {
+  width: 100%;
+  background: var(--success, #1a7f4b);
+  color: #fff;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-size: 0.9rem;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+/* ── Form ── */
+
+.form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
 }
 
 .field {
+  width: 100%;
   margin-bottom: 20px;
 }
 
@@ -54,30 +83,39 @@
   display: block;
   font-size: 0.85rem;
   color: var(--text-secondary);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
-.field input {
+/* Large centered OTP input */
+.codeInput {
   width: 100%;
-  padding: 12px 14px;
+  padding: 16px 14px;
   background: var(--bg-base);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text-primary);
-  font-size: 1rem;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: 0.5rem;
+  text-align: center;
   transition: border-color var(--transition);
+  box-sizing: border-box;
 }
 
-.field input:focus {
+.codeInput:focus {
   outline: none;
   border-color: var(--accent);
 }
 
-.field input::placeholder {
+.codeInput::placeholder {
   color: var(--text-secondary);
+  letter-spacing: 0.3rem;
+  font-weight: 400;
 }
 
-.button {
+/* ── Buttons ── */
+
+.primaryButton {
   width: 100%;
   padding: 14px;
   background: var(--accent);
@@ -86,54 +124,37 @@
   border-radius: var(--radius);
   font-size: 1rem;
   font-weight: 600;
-  transition: background var(--transition);
+  cursor: pointer;
+  transition: background var(--transition), opacity var(--transition);
+  margin-bottom: 0;
 }
 
-.button:hover:not(:disabled) {
+.primaryButton:hover:not(:disabled) {
   background: var(--accent-hover);
 }
 
-.button:disabled {
+.primaryButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: 20px 0 0;
+.resendLink {
+  margin-top: 16px;
+  background: none;
+  border: none;
   color: var(--text-secondary);
   font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: underline;
+  transition: color var(--transition);
+  padding: 0;
 }
 
-.divider::before,
-.divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: var(--border);
+.resendLink:hover:not(:disabled) {
+  color: var(--accent);
 }
 
-.biometricButton {
-  width: 100%;
-  padding: 14px;
-  background: transparent;
-  color: var(--text-primary);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  font-size: 1rem;
-  font-weight: 500;
-  margin-top: 12px;
-  transition: border-color var(--transition), background var(--transition);
-}
-
-.biometricButton:hover:not(:disabled) {
-  border-color: var(--accent);
-  background: var(--bg-base);
-}
-
-.biometricButton:disabled {
-  opacity: 0.6;
+.resendLink:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }

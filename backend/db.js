@@ -18,21 +18,12 @@ db.pragma('foreign_keys = ON');
 
 // ─── Migrations ────────────────────────────────────────────────────────────
 db.exec(`
-  CREATE TABLE IF NOT EXISTS webauthn_credentials (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id     TEXT    NOT NULL DEFAULT 'guille',
-    credential_id TEXT  NOT NULL UNIQUE,
-    public_key  TEXT    NOT NULL,
-    counter     INTEGER NOT NULL DEFAULT 0,
-    device_type TEXT    DEFAULT '',
-    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS webauthn_challenges (
-    id          INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id     TEXT    NOT NULL DEFAULT 'guille',
-    challenge   TEXT    NOT NULL,
-    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+  CREATE TABLE IF NOT EXISTS otp_codes (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    code       TEXT    NOT NULL,
+    used       INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    expires_at TEXT    NOT NULL
   );
 
   CREATE TABLE IF NOT EXISTS tasks (
@@ -65,13 +56,8 @@ db.exec(`
   );
 `);
 
-// ─── Column migrations (safe — ignores if column already exists) ─────────
-const runMigration = (sql) => {
-  try { db.exec(sql); } catch (_) { /* column already exists */ }
-};
-runMigration('ALTER TABLE webauthn_challenges ADD COLUMN rp_id TEXT DEFAULT "localhost"');
-runMigration('ALTER TABLE webauthn_challenges ADD COLUMN origin TEXT DEFAULT "http://localhost"');
-runMigration('ALTER TABLE webauthn_credentials ADD COLUMN rp_id TEXT DEFAULT "localhost"');
+// ─── OTP cleanup: remove expired codes on startup ─────────────────────────
+db.prepare("DELETE FROM otp_codes WHERE expires_at < datetime('now')").run();
 
 // ─── Seed initial events if table is empty ────────────────────────────────
 const eventsCount = db.prepare('SELECT COUNT(*) as count FROM events').get();
