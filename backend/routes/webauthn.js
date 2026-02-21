@@ -87,8 +87,10 @@ router.post('/register/start', authMiddleware, async (req, res) => {
         type: 'public-key',
       })),
       authenticatorSelection: {
-        userVerification: 'preferred',
-        residentKey: 'preferred',
+        userVerification: 'required',
+        residentKey: 'discouraged',       // no usa el gestor de passkeys de Android
+        requireResidentKey: false,        // compatible con más dispositivos
+        authenticatorAttachment: 'platform', // siempre biométrico del dispositivo
       },
     });
 
