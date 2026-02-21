@@ -74,24 +74,34 @@ export default function Chat() {
     scrollToBottom();
   }, [messages.length, streaming, scrollToBottom]);
 
-  // Bug 1: Handle mobile keyboard with visualViewport API
+  // Handle mobile keyboard with visualViewport API
   useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    
-    const handler = () => {
-      const el = document.querySelector('[data-chat-messages]');
-      if (el) {
-        el.style.maxHeight = `${vv.height - 120}px`; // header ~50 + input ~70
-      }
+    const wrapper = document.querySelector('[data-chat-wrapper]');
+    if (!wrapper) return;
+
+    const NAV_HEIGHT = 64;
+
+    const updateLayout = () => {
+      const vv = window.visualViewport;
+      if (!vv) return;
+      // La diferencia entre window.innerHeight y vv.height es la altura del teclado
+      const keyboardHeight = window.innerHeight - vv.height - vv.offsetTop;
+      const bottom = Math.max(NAV_HEIGHT, keyboardHeight + NAV_HEIGHT);
+      wrapper.style.bottom = `${bottom}px`;
     };
-    
-    vv.addEventListener('resize', handler);
-    vv.addEventListener('scroll', handler);
-    
+
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener('resize', updateLayout);
+      vv.addEventListener('scroll', updateLayout);
+      updateLayout();
+    }
+
     return () => {
-      vv.removeEventListener('resize', handler);
-      vv.removeEventListener('scroll', handler);
+      if (vv) {
+        vv.removeEventListener('resize', updateLayout);
+        vv.removeEventListener('scroll', updateLayout);
+      }
     };
   }, []);
 
@@ -207,7 +217,7 @@ export default function Chat() {
   }
 
   return (
-    <div className={styles.wrapper}>
+    <div className={styles.wrapper} data-chat-wrapper>
       {/* Header */}
       <div className={styles.header}>
         <span className={styles.headerTitle}>Kai</span>

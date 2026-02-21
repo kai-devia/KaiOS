@@ -1,11 +1,14 @@
 /* ── Layout ──────────────────────────────────────────────────────────────── */
 .wrapper {
-  position: relative;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 64px; /* height del BottomNav */
   display: flex;
   flex-direction: column;
-  height: 100%;
-  overflow: hidden;
   background: var(--bg-base);
+  overflow: hidden;
 }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
@@ -299,4 +302,16 @@
   margin: 8px 0 4px;
   font-size: 1em;
   font-weight: 700;
+}
+
+/* ── Desktop layout ──────────────────────────────────────────────────────── */
+@media (min-width: 769px) {
+  .wrapper {
+    position: relative;
+    bottom: auto;
+    top: auto;
+    left: auto;
+    right: auto;
+    height: 100%;
+  }
 }
