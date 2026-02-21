@@ -60,9 +60,12 @@ export default function Chat() {
   const [streaming, setStreaming]       = useState(false);
   const [streamingText, setStreamingText] = useState('');
   const [error, setError]               = useState(null);
+  const [queueLength, setQueueLength]   = useState(0);
 
   const bottomRef  = useRef(null);
   const inputRef   = useRef(null);
+  const queueRef   = useRef([]);
+  const processingRef = useRef(false);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -90,14 +93,21 @@ export default function Chat() {
     scrollToBottom();
   }, [messages.length, streaming, streamingText, scrollToBottom]);
 
-  // Send a message — triggers SSE stream
-  const sendMessage = useCallback(async () => {
-    const text = input.trim();
-    if (!text || streaming) return;
+  // Process queue whenever it has items and we're not processing
+  useEffect(() => {
+    if (!processingRef.current && queueRef.current.length > 0) {
+      processQueue();
+    }
+  }, [queueLength, processQueue]);
 
-    setInput('');
-    // Reset textarea height
-    if (inputRef.current) inputRef.current.style.height = 'auto';
+  // Process queue of pending messages
+  const processQueue = useCallback(async () => {
+    if (processingRef.current || queueRef.current.length === 0) return;
+
+    processingRef.current = true;
+    const text = queueRef.current.shift();
+    setQueueLength(queueRef.current.length);
+
     setStreaming(true);
     setStreamingText('');
     setError(null);
@@ -151,8 +161,38 @@ export default function Chat() {
       setError(err.message);
       setStreaming(false);
       setStreamingText('');
+    } finally {
+      processingRef.current = false;
+      // Process next in queue
+      if (queueRef.current.length > 0) {
+        setTimeout(() => processQueue(), 0);
+      }
     }
-  }, [input, streaming]);
+  }, []);
+
+  // Send a message — adds to queue
+  const sendMessage = useCallback(async () => {
+    const text = input.trim();
+    if (!text) return;
+
+    setInput('');
+    // Reset textarea height
+    if (inputRef.current) inputRef.current.style.height = 'auto';
+
+    // Add to queue
+    queueRef.current.push(text);
+    setQueueLength(queueRef.current.length);
+
+    // Keep focus on input
+    setTimeout(() => {
+      if (inputRef.current) inputRef.current.focus();
+    }, 0);
+
+    // Process queue if not already processing
+    if (!processingRef.current) {
+      processQueue();
+    }
+  }, [input, processQueue]);
 
   const handleKeyDown = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -234,17 +274,32 @@ export default function Chat() {
         />
         <button
           className={styles.sendBtn}
-          onPointerDown={(e) => e.preventDefault()} /* evita que el botón robe el foco */
           onClick={sendMessage}
-          disabled={!input.trim() || streaming}
-          aria-label="Enviar"
+          disabled={!input.trim()}
+          style={{ position: 'relative' }}
         >
-          {streaming
-            ? <span className={styles.sendDots}><span/><span/><span/></span>
-            : <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20">
-                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-              </svg>
-          }
+          →
+          {queueLength > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: '-4px',
+              right: '-4px',
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              background: 'var(--accent)',
+              color: '#000',
+              fontSize: '0.7rem',
+              fontWeight: '700',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '2px solid var(--bg-surface)',
+              fontWeight: 'bold'
+            }}>
+              {queueLength}
+            </span>
+          )}
         </button>
       </div>
     </div>
