@@ -17,8 +17,8 @@ export default defineConfig({
         name: 'KAI',
         short_name: 'KAI',
         description: 'Tu mano derecha técnica',
-        theme_color: '#7c6af7',
-        background_color: '#0d0d0d',
+        theme_color: '#00d4aa',
+        background_color: '#111118',
         display: 'standalone',
         icons: [
           {

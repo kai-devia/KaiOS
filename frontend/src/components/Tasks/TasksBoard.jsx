@@ -20,7 +20,7 @@ const PRIORITY_COLORS = {
 
 const STATUS_COLORS = {
   BACKLOG: '#555',
-  ANALIZANDO: '#7c6af7',
+  ANALIZANDO: '#00d4aa',
   'LISTO PARA EMPEZAR': '#06b6d4',
   'EN PROGRESO': '#f59e0b',
   'PARA REVISAR': '#ec4899',
