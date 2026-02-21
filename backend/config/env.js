@@ -23,5 +23,5 @@ module.exports = {
   authPass: process.env.AUTH_PASS,
   port: parseInt(process.env.PORT, 10) || 3001,
   workspaceRoot: process.env.WORKSPACE_ROOT,
-  jwtExpiry: '7d',
+  jwtExpiry: '30d',
 };
