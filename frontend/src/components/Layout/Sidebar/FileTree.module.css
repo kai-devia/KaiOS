@@ -1,0 +1,58 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.item {
+  margin: 2px 0;
+}
+
+.folder,
+.file {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  text-align: left;
+  border-radius: var(--radius);
+  transition: background var(--transition);
+}
+
+.folder:hover,
+.file:hover {
+  background: var(--bg-card);
+}
+
+.file.active {
+  background: var(--accent);
+  color: #fff;
+}
+
+.arrow {
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+  width: 12px;
+}
+
+.arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.folderIcon,
+.fileIcon {
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
+.name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
