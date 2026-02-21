@@ -218,24 +218,20 @@ export default function Chat() {
 
   return (
     <div className={styles.wrapper} data-chat-wrapper>
-      {/* Header */}
-      <div className={styles.header}>
-        <span className={styles.headerTitle}>Kai</span>
-        <div className={styles.headerActions}>
-          {messages.length > 0 && (
-            <button className={styles.clearBtn} onClick={clearHistory}>
-              Limpiar
-            </button>
-          )}
-        </div>
-      </div>
-
       {/* Messages */}
       <div className={styles.messages} data-chat-messages>
         {messages.length === 0 && !streaming && (
           <div className={styles.empty}>
             <p className={styles.emptyTitle}>Kai está listo</p>
             <p className={styles.emptySub}>Escribe un mensaje para empezar</p>
+          </div>
+        )}
+
+        {messages.length > 0 && (
+          <div className={styles.clearRow}>
+            <button className={styles.clearBtn} onClick={clearHistory}>
+              Limpiar historial
+            </button>
           </div>
         )}
 

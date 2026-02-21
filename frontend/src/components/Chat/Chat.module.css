@@ -1,7 +1,7 @@
 /* ── Layout ──────────────────────────────────────────────────────────────── */
 .wrapper {
   position: fixed;
-  top: 0;
+  top: var(--header-height, 56px); /* debajo del header global */
   left: 0;
   right: 0;
   bottom: 64px; /* height del BottomNav */
@@ -11,43 +11,24 @@
   overflow: hidden;
 }
 
-/* ── Header ──────────────────────────────────────────────────────────────── */
-.header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+/* ── Clear history row ───────────────────────────────────────────────────── */
+.clearRow {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px 12px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg-surface);
-  flex-shrink: 0;
-}
-
-.headerTitle {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.headerActions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  justify-content: center;
+  padding: 4px 0 8px;
 }
 
 .clearBtn {
   background: none;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 4px 12px;
-  font-size: 0.75rem;
+  border: none;
+  font-size: 0.72rem;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: border-color var(--transition), color var(--transition);
+  opacity: 0.5;
+  transition: opacity var(--transition), color var(--transition);
+  padding: 4px 8px;
 }
-.clearBtn:hover { border-color: var(--danger); color: var(--danger); }
+.clearBtn:hover { opacity: 1; color: var(--danger); }
 
 /* ── Messages ────────────────────────────────────────────────────────────── */
 .messages {
