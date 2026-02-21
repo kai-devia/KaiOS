@@ -12,6 +12,7 @@ const authRoutes = require('./routes/auth');
 const filesRoutes = require('./routes/files');
 const tasksRoutes = require('./routes/tasks');
 const eventsRoutes = require('./routes/events');
+const systemRoutes = require('./routes/system');
 
 // Initialize SQLite database (creates tables + seed data on first run)
 require('./db');
@@ -28,6 +29,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/events', eventsRoutes);
+app.use('/api/system', systemRoutes);
 
 // Serve static frontend (./public in Docker, ../frontend/dist in dev)
 const frontendDist = process.env.NODE_ENV === 'production' 
