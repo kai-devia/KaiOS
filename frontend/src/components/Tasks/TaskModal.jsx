@@ -20,7 +20,7 @@ const EMPTY = {
   assignee: '',
 };
 
-export default function TaskModal({ task, initialStatus, onSave, onClose }) {
+export default function TaskModal({ task, initialStatus, onSave, onClose, onDelete }) {
   const [form, setForm] = useState(() =>
     task ? { ...task } : { ...EMPTY, status: initialStatus || 'BACKLOG' }
   );
@@ -148,6 +148,15 @@ export default function TaskModal({ task, initialStatus, onSave, onClose }) {
           </div>
 
           <div className={styles.modalActions}>
+            {onDelete && (
+              <button
+                type="button"
+                className={styles.deleteBtn}
+                onClick={() => { if (window.confirm('¿Eliminar esta tarea?')) onDelete(); }}
+              >
+                🗑️
+              </button>
+            )}
             <button type="button" className={styles.cancelBtn} onClick={onClose}>
               Cancelar
             </button>

@@ -13,7 +13,7 @@ const EMPTY = {
   schedule: '',
 };
 
-export default function EventModal({ event, onSave, onClose }) {
+export default function EventModal({ event, onSave, onClose, onDelete }) {
   const [form, setForm] = useState(() =>
     event ? { ...event } : { ...EMPTY }
   );
@@ -122,6 +122,15 @@ export default function EventModal({ event, onSave, onClose }) {
           </div>
 
           <div className={styles.modalActions}>
+            {onDelete && (
+              <button
+                type="button"
+                className={styles.deleteBtn}
+                onClick={() => { if (window.confirm('¿Eliminar este pulso?')) onDelete(); }}
+              >
+                🗑️
+              </button>
+            )}
             <button type="button" className={styles.cancelBtn} onClick={onClose}>
               Cancelar
             </button>

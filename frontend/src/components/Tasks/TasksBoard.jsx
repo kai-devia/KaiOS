@@ -12,135 +12,51 @@ const STATUSES = [
   'FINALIZADO',
 ];
 
-const PRIORITY_COLORS = {
-  Alta: 'var(--danger)',
-  Medio: 'var(--warning)',
-  Baja: 'var(--success)',
+// Order for visual sorting (most active first)
+const STATUS_ORDER = {
+  'EN PROGRESO': 0,
+  'PARA REVISAR': 1,
+  'LISTO PARA EMPEZAR': 2,
+  ANALIZANDO: 3,
+  BACKLOG: 4,
+  FINALIZADO: 5,
 };
 
-const STATUS_COLORS = {
-  BACKLOG: '#555',
-  ANALIZANDO: '#00d4aa',
-  'LISTO PARA EMPEZAR': '#06b6d4',
-  'EN PROGRESO': '#f59e0b',
-  'PARA REVISAR': '#ec4899',
-  FINALIZADO: 'var(--success)',
+const STATUS_STYLES = {
+  BACKLOG:              { bg: '#33333322', color: '#888',        border: '#44444444' },
+  ANALIZANDO:           { bg: '#00d4aa22', color: 'var(--accent)', border: '#00d4aa44' },
+  'LISTO PARA EMPEZAR': { bg: '#06b6d422', color: '#22d3ee',    border: '#06b6d444' },
+  'EN PROGRESO':        { bg: '#f59e0b22', color: '#fbbf24',    border: '#f59e0b44' },
+  'PARA REVISAR':       { bg: '#ec489922', color: '#f472b6',    border: '#ec489944' },
+  FINALIZADO:           { bg: '#4ade8022', color: 'var(--success)', border: '#4ade8044' },
 };
 
-function formatDate(str) {
-  if (!str) return null;
-  return new Date(str).toLocaleDateString('es-ES', {
-    day: '2-digit', month: '2-digit', year: '2-digit',
-  });
-}
+const PRIORITY_STYLES = {
+  Alta:  { color: 'var(--danger)' },
+  Medio: { color: 'var(--warning)' },
+  Baja:  { color: 'var(--success)' },
+};
 
-function TaskCard({ task, onEdit, onDelete, onMove }) {
-  const nextStatus = STATUSES[STATUSES.indexOf(task.status) + 1];
-  const priorityColor = PRIORITY_COLORS[task.priority] || '#888';
-
-  const handleDelete = () => {
-    if (window.confirm(`¿Eliminar "${task.title}"?`)) {
-      onDelete(task.id);
-    }
-  };
-
+function Badge({ value, styleMap }) {
+  const s = styleMap[value] || { bg: '#33333322', color: '#888', border: '#44444444' };
   return (
-    <div className={styles.card}>
-      <div className={styles.cardHeader}>
-        <span className={styles.cardTitle}>{task.title}</span>
-        {task.project && (
-          <span className={styles.projectTag}>{task.project}</span>
-        )}
-      </div>
-
-      {task.description && (
-        <p className={styles.cardDesc}>{task.description}</p>
-      )}
-
-      <div className={styles.cardBadges}>
-        <span
-          className={styles.badge}
-          style={{ background: `${priorityColor}22`, color: priorityColor, borderColor: `${priorityColor}44` }}
-        >
-          {task.priority}
-        </span>
-        <span className={styles.badgeNeutral}>{task.effort}</span>
-        {task.task_type && (
-          <span className={styles.badgeNeutral}>{task.task_type}</span>
-        )}
-      </div>
-
-      {task.assignee && (
-        <div className={styles.cardAssignee}>👤 {task.assignee}</div>
-      )}
-
-      {(task.started_at || task.finished_at) && (
-        <div className={styles.cardDates}>
-          {task.started_at && <span>▶ {formatDate(task.started_at)}</span>}
-          {task.finished_at && <span>✓ {formatDate(task.finished_at)}</span>}
-        </div>
-      )}
-
-      <div className={styles.cardActions}>
-        {nextStatus && (
-          <button
-            className={styles.moveBtn}
-            onClick={() => onMove(task, nextStatus)}
-            title={`Mover a ${nextStatus}`}
-          >
-            → {nextStatus.length > 12 ? nextStatus.slice(0, 12) + '…' : nextStatus}
-          </button>
-        )}
-        <button className={styles.editBtn} onClick={() => onEdit(task)} title="Editar">
-          ✏️
-        </button>
-        <button className={styles.deleteBtn} onClick={handleDelete} title="Eliminar">
-          🗑️
-        </button>
-      </div>
-    </div>
+    <span className={styles.badge} style={{ background: s.bg, color: s.color, borderColor: s.border }}>
+      {value}
+    </span>
   );
 }
 
-function Column({ status, tasks, onNewTask, onEdit, onDelete, onMove }) {
-  const color = STATUS_COLORS[status];
-
-  return (
-    <div className={styles.column}>
-      <div className={styles.columnHeader} style={{ borderTopColor: color }}>
-        <span className={styles.columnTitle}>{status}</span>
-        <span className={styles.columnCount} style={{ background: color }}>
-          {tasks.length}
-        </span>
-      </div>
-
-      <div className={styles.columnCards}>
-        {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onEdit={onEdit}
-            onDelete={onDelete}
-            onMove={onMove}
-          />
-        ))}
-      </div>
-
-      <button
-        className={styles.newTaskBtn}
-        onClick={() => onNewTask(status)}
-      >
-        + Nueva tarea
-      </button>
-    </div>
-  );
+function PriorityDot({ priority }) {
+  const s = PRIORITY_STYLES[priority] || { color: '#888' };
+  return <span className={styles.priorityDot} style={{ background: s.color }} title={priority} />;
 }
 
 export default function TasksBoard() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [modal, setModal] = useState(null); // { task?, initialStatus? }
+  const [filter, setFilter] = useState('Todas');
+  const [modal, setModal] = useState(null); // null | { task?, initialStatus? }
 
   const load = useCallback(async () => {
     try {
@@ -164,73 +80,100 @@ export default function TasksBoard() {
       const created = await createTask(form);
       setTasks((prev) => [created, ...prev]);
     }
+    setModal(null);
   };
 
   const handleDelete = async (id) => {
     await deleteTask(id);
     setTasks((prev) => prev.filter((t) => t.id !== id));
+    setModal(null);
   };
 
-  const handleMove = async (task, nextStatus) => {
-    const updated = await updateTask(task.id, { status: nextStatus });
-    setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-  };
+  const filters = ['Todas', ...STATUSES];
+  const filtered = tasks
+    .filter((t) => filter === 'Todas' || t.status === filter)
+    .sort((a, b) => (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9));
 
-  const tasksByStatus = STATUSES.reduce((acc, s) => {
-    acc[s] = tasks.filter((t) => t.status === s);
-    return acc;
-  }, {});
-
-  if (loading) {
-    return (
-      <div className={styles.centered}>
-        <div className={styles.spinner} />
-        <p>Cargando tareas...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className={styles.centered}>
-        <p className={styles.errorText}>⚠️ {error}</p>
-        <button className={styles.retryBtn} onClick={load}>Reintentar</button>
-      </div>
-    );
-  }
+  if (loading) return <div className={styles.centered}><div className={styles.spinner} /><p>Cargando...</p></div>;
+  if (error) return <div className={styles.centered}><p className={styles.errorText}>⚠️ {error}</p><button className={styles.retryBtn} onClick={load}>Reintentar</button></div>;
 
   return (
-    <div className={styles.boardWrapper}>
-      <div className={styles.boardHeader}>
-        <h1 className={styles.boardTitle}>📋 Registro de Tareas</h1>
-        <button
-          className={styles.newBtn}
-          onClick={() => setModal({ task: null, initialStatus: 'BACKLOG' })}
-        >
-          + Nueva Tarea
+    <div className={styles.listWrapper}>
+      {/* Header */}
+      <div className={styles.listHeader}>
+        <h1 className={styles.listTitle}>📋 Tareas</h1>
+        <button className={styles.newBtn} onClick={() => setModal({ task: null, initialStatus: 'BACKLOG' })}>
+          + Nueva
         </button>
       </div>
 
-      <div className={styles.board}>
-        {STATUSES.map((status) => (
-          <Column
-            key={status}
-            status={status}
-            tasks={tasksByStatus[status]}
-            onNewTask={(s) => setModal({ task: null, initialStatus: s })}
-            onEdit={(task) => setModal({ task })}
-            onDelete={handleDelete}
-            onMove={handleMove}
-          />
+      {/* Filter chips */}
+      <div className={styles.filterRow}>
+        {filters.map((f) => (
+          <button
+            key={f}
+            className={`${styles.filterChip} ${filter === f ? styles.filterActive : ''}`}
+            onClick={() => setFilter(f)}
+          >
+            {f === 'Todas' ? 'Todas' : (f.length > 10 ? f.split(' ').pop() : f)}
+            {f !== 'Todas' && (
+              <span className={styles.chipCount}>
+                {tasks.filter((t) => t.status === f).length}
+              </span>
+            )}
+          </button>
         ))}
       </div>
 
+      {/* List */}
+      {filtered.length === 0 ? (
+        <div className={styles.empty}>
+          <p>No hay tareas{filter !== 'Todas' ? ` en "${filter}"` : ''}.</p>
+        </div>
+      ) : (
+        <ul className={styles.list}>
+          {filtered.map((task) => {
+            const ss = STATUS_STYLES[task.status] || STATUS_STYLES.BACKLOG;
+            return (
+              <li
+                key={task.id}
+                className={styles.listItem}
+                onClick={() => setModal({ task })}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && setModal({ task })}
+              >
+                <PriorityDot priority={task.priority} />
+                <div className={styles.itemMain}>
+                  <span className={styles.itemTitle}>{task.title}</span>
+                  {task.project && <span className={styles.itemProject}>{task.project}</span>}
+                </div>
+                <span
+                  className={styles.statusChip}
+                  style={{ background: ss.bg, color: ss.color, borderColor: ss.border }}
+                >
+                  {task.status.length > 10 ? task.status.split(' ').pop() : task.status}
+                </span>
+                <span className={styles.chevron}>›</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* Total count */}
+      {filtered.length > 0 && (
+        <p className={styles.totalCount}>{filtered.length} tarea{filtered.length !== 1 ? 's' : ''}</p>
+      )}
+
+      {/* Modal */}
       {modal !== null && (
         <TaskModal
           task={modal.task}
           initialStatus={modal.initialStatus}
           onSave={handleSave}
           onClose={() => setModal(null)}
+          onDelete={modal.task ? () => handleDelete(modal.task.id) : null}
         />
       )}
     </div>

@@ -10,79 +10,22 @@ const STATUS_STYLES = {
   ERRORES:     { bg: '#f8717122', color: 'var(--danger)',   border: '#f8717144' },
 };
 
-const NOTIFY_STYLES = {
-  NO:       { bg: '#6b728022', color: '#9ca3af',        border: '#6b728044' },
-  TELEGRAM: { bg: '#60a5fa22', color: '#60a5fa',        border: '#60a5fa44' },
-  MAIL:     { bg: '#f9731622', color: '#fb923c',        border: '#f9731644' },
-  SI:       { bg: '#a855f722', color: '#c084fc',        border: '#a855f744' },
+const STATUS_ICONS = {
+  FINALIZADO: '✅',
+  PROCESANDO: '⚙️',
+  PAUSADO:    '⏸️',
+  ERRORES:    '❌',
 };
 
 function timeAgo(str) {
-  if (!str) return '—';
+  if (!str) return null;
   const diff = Date.now() - new Date(str).getTime();
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return 'ahora mismo';
   if (mins < 60) return `hace ${mins} min`;
   const hrs = Math.floor(mins / 60);
   if (hrs < 24) return `hace ${hrs}h`;
-  const days = Math.floor(hrs / 24);
-  return `hace ${days}d`;
-}
-
-function StatusBadge({ value }) {
-  const s = STATUS_STYLES[value] || STATUS_STYLES.PAUSADO;
-  return (
-    <span
-      className={styles.badge}
-      style={{ background: s.bg, color: s.color, borderColor: s.border }}
-    >
-      {value}
-    </span>
-  );
-}
-
-function NotifyBadge({ value }) {
-  const s = NOTIFY_STYLES[value] || NOTIFY_STYLES.NO;
-  return (
-    <span
-      className={styles.badge}
-      style={{ background: s.bg, color: s.color, borderColor: s.border }}
-    >
-      {value}
-    </span>
-  );
-}
-
-function EventRow({ event, onEdit, onDelete }) {
-  const handleDelete = () => {
-    if (window.confirm(`¿Eliminar el evento "${event.name}"?`)) {
-      onDelete(event.id);
-    }
-  };
-
-  return (
-    <tr className={styles.tableRow}>
-      <td className={styles.tdName}>
-        <div className={styles.eventName}>{event.name}</div>
-        {event.description && (
-          <div className={styles.eventDesc}>{event.description}</div>
-        )}
-      </td>
-      <td><StatusBadge value={event.status} /></td>
-      <td className={styles.tdMeta}>{event.owner || '—'}</td>
-      <td><NotifyBadge value={event.notify} /></td>
-      <td className={styles.tdMeta}>{event.schedule || '—'}</td>
-      <td className={styles.tdMeta}>{timeAgo(event.last_run)}</td>
-      <td className={styles.tdActions}>
-        <button className={styles.editBtn} onClick={() => onEdit(event)} title="Editar">
-          ✏️
-        </button>
-        <button className={styles.deleteBtn} onClick={handleDelete} title="Eliminar">
-          🗑️
-        </button>
-      </td>
-    </tr>
-  );
+  return `hace ${Math.floor(hrs / 24)}d`;
 }
 
 export default function EventsPanel() {
@@ -113,83 +56,79 @@ export default function EventsPanel() {
       const created = await createEvent(form);
       setEvents((prev) => [created, ...prev]);
     }
+    setModal(null);
   };
 
   const handleDelete = async (id) => {
     await deleteEvent(id);
     setEvents((prev) => prev.filter((e) => e.id !== id));
+    setModal(null);
   };
 
-  if (loading) {
-    return (
-      <div className={styles.centered}>
-        <div className={styles.spinner} />
-        <p>Cargando eventos...</p>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className={styles.centered}>
-        <p className={styles.errorText}>⚠️ {error}</p>
-        <button className={styles.retryBtn} onClick={load}>Reintentar</button>
-      </div>
-    );
-  }
+  if (loading) return <div className={styles.centered}><div className={styles.spinner} /><p>Cargando...</p></div>;
+  if (error) return <div className={styles.centered}><p className={styles.errorText}>⚠️ {error}</p><button className={styles.retryBtn} onClick={load}>Reintentar</button></div>;
 
   return (
-    <div className={styles.panelWrapper}>
-      <div className={styles.panelHeader}>
-        <h1 className={styles.panelTitle}>⚡ Pulso de Eventos</h1>
-        <button
-          className={styles.newBtn}
-          onClick={() => setModal({ event: null })}
-        >
-          + Nuevo Evento
+    <div className={styles.listWrapper}>
+      {/* Header */}
+      <div className={styles.listHeader}>
+        <h1 className={styles.listTitle}>⚡ Pulsos</h1>
+        <button className={styles.newBtn} onClick={() => setModal({ event: null })}>
+          + Nuevo
         </button>
       </div>
 
+      {/* List */}
       {events.length === 0 ? (
         <div className={styles.empty}>
-          <p>No hay eventos registrados.</p>
+          <p>No hay pulsos registrados.</p>
           <button className={styles.newBtn} onClick={() => setModal({ event: null })}>
-            + Crear primer evento
+            + Crear primer pulso
           </button>
         </div>
       ) : (
-        <div className={styles.tableWrapper}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th>Evento</th>
-                <th>Estado</th>
-                <th>Owner</th>
-                <th>Notificar</th>
-                <th>Schedule</th>
-                <th>Última ejecución</th>
-                <th>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.map((event) => (
-                <EventRow
-                  key={event.id}
-                  event={event}
-                  onEdit={(ev) => setModal({ event: ev })}
-                  onDelete={handleDelete}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className={styles.list}>
+          {events.map((event) => {
+            const ss = STATUS_STYLES[event.status] || STATUS_STYLES.PAUSADO;
+            const icon = STATUS_ICONS[event.status] || '⏸️';
+            const ago = timeAgo(event.last_run);
+            return (
+              <li
+                key={event.id}
+                className={styles.listItem}
+                onClick={() => setModal({ event })}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => e.key === 'Enter' && setModal({ event })}
+              >
+                <span className={styles.statusIcon}>{icon}</span>
+                <div className={styles.itemMain}>
+                  <span className={styles.itemTitle}>{event.name}</span>
+                  <div className={styles.itemMeta}>
+                    {event.schedule && <span className={styles.metaChip}>{event.schedule}</span>}
+                    {ago && <span className={styles.metaTime}>{ago}</span>}
+                  </div>
+                </div>
+                <span
+                  className={styles.statusChip}
+                  style={{ background: ss.bg, color: ss.color, borderColor: ss.border }}
+                >
+                  {event.status}
+                </span>
+                <span className={styles.chevron}>›</span>
+              </li>
+            );
+          })}
+        </ul>
       )}
 
+      {/* Modal */}
       {modal !== null && (
         <EventModal
           event={modal.event}
           onSave={handleSave}
           onClose={() => setModal(null)}
+          onDelete={modal.event ? () => handleDelete(modal.event.id) : null}
         />
       )}
     </div>
