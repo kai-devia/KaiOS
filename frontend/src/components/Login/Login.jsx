@@ -27,9 +27,9 @@ export default function Login() {
     try {
       await requestOtp();
       setStep('verify');
-      setSuccess('Código enviado a Telegram ✅');
+      setSuccess('✅ Código enviado');
     } catch (err) {
-      setError(err.message || 'No se pudo enviar el código. ¿Está Telegram disponible?');
+      setError(err.message || 'No se pudo enviar el código. Inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }
@@ -82,7 +82,7 @@ export default function Login() {
             onClick={handleRequestOtp}
             disabled={loading}
           >
-            {loading ? '⏳ Enviando...' : '📱 Enviar código a Telegram'}
+            {loading ? '⏳ Solicitando...' : '🔐 Solicitar código'}
           </button>
         )}
 
