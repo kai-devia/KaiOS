@@ -76,7 +76,7 @@ function TreeNode({ item, search, expanded, onToggle, onFileClick, currentPath, 
       const endpoint = creating === 'file' ? `${apiBase}/create` : `${apiBase}/mkdir`;
       const res = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('kai_token')}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('kai-doc-token')}` },
         body: JSON.stringify({ path: newPath, agentId: agentId || 'kai' }),
       });
       const data = await res.json();
@@ -101,7 +101,7 @@ function TreeNode({ item, search, expanded, onToggle, onFileClick, currentPath, 
     try {
       const res = await fetch(`${apiBase}/rename`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('kai_token')}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('kai-doc-token')}` },
         body: JSON.stringify({ oldPath: item.path, newPath, agentId: agentId || 'kai' }),
       });
       const data = await res.json();
@@ -122,7 +122,7 @@ function TreeNode({ item, search, expanded, onToggle, onFileClick, currentPath, 
     try {
       const res = await fetch(`${apiBase}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('kai_token')}` },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('kai-doc-token')}` },
         body: JSON.stringify({ path: item.path, agentId: agentId || 'kai' }),
       });
       const data = await res.json();
