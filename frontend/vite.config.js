@@ -12,6 +12,8 @@ export default defineConfig({
         skipWaiting: true,       // nuevo SW activa inmediatamente sin esperar
         clientsClaim: true,      // el nuevo SW toma control de todas las tabs
         cleanupOutdatedCaches: true,
+        // Excluir rutas externas del NavigationRoute — no interceptar /deviamodel
+        navigateFallbackDenylist: [/^\/deviamodel/],
       },
       manifest: {
         name: 'KAI',

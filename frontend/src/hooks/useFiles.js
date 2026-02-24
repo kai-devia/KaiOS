@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getFileTree, getFileList, getFileContent, saveFileContent } from '../api/client';
 
-export function useFiles() {
+export function useFiles(agentId) {
   const [tree, setTree] = useState([]);
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -9,21 +9,21 @@ export function useFiles() {
 
   const loadTree = useCallback(async () => {
     try {
-      const data = await getFileTree();
+      const data = await getFileTree(agentId);
       setTree(data);
     } catch (err) {
       setError(err.message);
     }
-  }, []);
+  }, [agentId]);
 
   const loadFiles = useCallback(async () => {
     try {
-      const data = await getFileList();
+      const data = await getFileList(agentId);
       setFiles(data);
     } catch (err) {
       setError(err.message);
     }
-  }, []);
+  }, [agentId]);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -38,7 +38,7 @@ export function useFiles() {
   return { tree, files, loading, error, refresh };
 }
 
-export function useFileContent(path) {
+export function useFileContent(path, agentId) {
   const [content, setContent] = useState('');
   const [mtime, setMtime] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -52,7 +52,7 @@ export function useFileContent(path) {
     setError(null);
     
     try {
-      const data = await getFileContent(path);
+      const data = await getFileContent(path, agentId);
       setContent(data.content);
       setMtime(data.mtime);
     } catch (err) {
@@ -60,7 +60,7 @@ export function useFileContent(path) {
     } finally {
       setLoading(false);
     }
-  }, [path]);
+  }, [path, agentId]);
 
   const save = useCallback(async (newContent) => {
     if (!path) return false;
@@ -68,7 +68,7 @@ export function useFileContent(path) {
     setSaving(true);
     
     try {
-      await saveFileContent(path, newContent);
+      await saveFileContent(path, newContent, agentId);
       setContent(newContent);
       return true;
     } catch (err) {
@@ -77,7 +77,7 @@ export function useFileContent(path) {
     } finally {
       setSaving(false);
     }
-  }, [path]);
+  }, [path, agentId]);
 
   useEffect(() => {
     load();

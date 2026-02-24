@@ -9,6 +9,7 @@ const { verifyToken } = require('./middlewares/auth');
 const { initWatcher, addClient, removeClient } = require('./services/watcherService');
 
 const authRoutes = require('./routes/auth');
+const agentsRoutes = require('./routes/agents');
 const filesRoutes = require('./routes/files');
 const tasksRoutes = require('./routes/tasks');
 const eventsRoutes = require('./routes/events');
@@ -28,6 +29,7 @@ app.use(express.json());
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/agents', agentsRoutes);
 app.use('/api/files', filesRoutes);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/events', eventsRoutes);

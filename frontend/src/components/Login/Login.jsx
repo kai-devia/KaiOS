@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CheckCircle, RefreshCw } from 'lucide-react';
 import { requestOtp, verifyOtp, setToken } from '../../api/client';
 import styles from './Login.module.css';
 
@@ -27,7 +28,7 @@ export default function Login() {
     try {
       await requestOtp();
       setStep('verify');
-      setSuccess('✅ Código enviado');
+      setSuccess('Código enviado a Telegram');
     } catch (err) {
       setError(err.message || 'No se pudo enviar el código. Inténtalo de nuevo.');
     } finally {
@@ -66,10 +67,8 @@ export default function Login() {
   return (
     <div className={styles.container}>
       <div className={styles.card}>
-        <div className={styles.logo}>
-          <img src="/kai-avatar.svg" alt="KAI" width="80" height="80" />
-        </div>
-        <h1 className={styles.title}>KAI</h1>
+        <img src="/kai-avatar.svg" alt="Kai" className={styles.avatar} />
+        <h1 className={styles.title}>Kai Devia</h1>
         <p className={styles.subtitle}>Tu mano derecha técnica</p>
 
         {error && <div className={styles.error}>{error}</div>}
@@ -84,7 +83,11 @@ export default function Login() {
             onClick={handleRequestOtp}
             disabled={loading}
           >
-            {loading ? '⏳ Solicitando...' : '🔐 Solicitar código'}
+            {loading ? (
+              <span className={styles.btnContent}><RefreshCw size={16} className={styles.spinning} /> Solicitando...</span>
+            ) : (
+              'Acceder'
+            )}
           </button>
         )}
 
@@ -113,7 +116,11 @@ export default function Login() {
               className={styles.primaryButton}
               disabled={loading || code.length !== 6}
             >
-              {loading ? '⏳ Verificando...' : '✅ Verificar'}
+              {loading ? (
+                <span className={styles.btnContent}><RefreshCw size={16} className={styles.spinning} /> Verificando...</span>
+              ) : (
+                <span className={styles.btnContent}><CheckCircle size={16} /> Verificar</span>
+              )}
             </button>
 
             <button

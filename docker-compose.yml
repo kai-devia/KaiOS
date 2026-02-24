@@ -11,12 +11,14 @@ services:
       - "80:3001"
     volumes:
       - /home/kai/.openclaw/workspace:/workspace:rw
+      - /home/kai/.openclaw/workspace-po-kai:/workspace-po-kai:rw
       - /home/kai/projects/kai-doc-pwa/data:/app/data:rw
       - /home/kai/.openclaw/agents:/home/kai/.openclaw/agents:ro
       - /home/kai/.kai-secrets:/app/vault-secrets:rw
-      - /home/kai/projects/devia/devia-model-web:/app/devia-model-web:ro
+      - /home/kai/projects/devia-model-web:/app/devia-model-web:ro
     environment:
       - WORKSPACE_ROOT=/workspace
+      - WORKSPACE_PO_KAI=/workspace-po-kai
       - JWT_SECRET=kai-doc-pwa-secret-2026
       - PORT=3001
       - TELEGRAM_BOT_TOKEN=8291237173:AAElzKvQHvIjVQZ8Pm2yaBFdoXB9aiRKqik

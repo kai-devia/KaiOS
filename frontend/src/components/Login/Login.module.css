@@ -19,6 +19,12 @@
   align-items: center;
 }
 
+.avatar {
+  width: 72px;
+  height: 72px;
+  margin-bottom: 20px;
+}
+
 .logo {
   font-size: 64px;
   margin-bottom: 8px;
@@ -27,8 +33,9 @@
 
 .title {
   text-align: center;
-  font-size: 1.75rem;
+  font-size: 1.6rem;
   font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--text-primary);
   margin-bottom: 4px;
 }
@@ -117,25 +124,45 @@
 
 .primaryButton {
   width: 100%;
-  padding: 14px;
+  padding: 13px 20px;
   background: var(--accent);
-  color: #fff;
+  color: #0a0f1a;
   border: none;
   border-radius: var(--radius);
-  font-size: 1rem;
+  font-size: 0.95rem;
   font-weight: 600;
+  letter-spacing: 0.02em;
   cursor: pointer;
-  transition: background var(--transition), opacity var(--transition);
+  transition: background var(--transition), opacity var(--transition), transform 80ms ease;
   margin-bottom: 0;
 }
 
 .primaryButton:hover:not(:disabled) {
   background: var(--accent-hover);
+  transform: translateY(-1px);
+}
+
+.primaryButton:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .primaryButton:disabled {
-  opacity: 0.6;
+  opacity: 0.55;
   cursor: not-allowed;
+}
+
+.btnContent {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinning {
+  animation: spin 0.8s linear infinite;
 }
 
 .resendLink {

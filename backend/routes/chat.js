@@ -68,23 +68,25 @@ Tienes acceso completo a herramientas: exec, read, write, browser, etc.`;
 
 console.log('[chat] system prompt will be built dynamically per request');
 
-// ── GET /api/chat/history ─────────────────────────────────────────────────
+// ── GET /api/chat/history?agentId=po-kai ─────────────────────────────────
 router.get('/history', (req, res) => {
   try {
     const limit = parseInt(req.query.limit || '100', 10);
+    const agentId = req.query.agentId || 'kai';
     const msgs = db.prepare(
-      'SELECT * FROM chat_messages ORDER BY id DESC LIMIT ?'
-    ).all(limit).reverse();
+      'SELECT * FROM chat_messages WHERE agent_id = ? ORDER BY id DESC LIMIT ?'
+    ).all(agentId, limit).reverse();
     res.json(msgs);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// ── DELETE /api/chat/history ──────────────────────────────────────────────
+// ── DELETE /api/chat/history?agentId=po-kai ──────────────────────────────
 router.delete('/history', (req, res) => {
   try {
-    db.prepare('DELETE FROM chat_messages').run();
+    const agentId = req.query.agentId || 'kai';
+    db.prepare('DELETE FROM chat_messages WHERE agent_id = ?').run(agentId);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -99,7 +101,7 @@ function sanitizeHistory(history) {
     .map(m => ({ role: m.role, content: m.content }));
 }
 
-async function streamToOpenClaw(message, res, history = [], sessionUser = SESSION_USER) {
+async function streamToOpenClaw(message, res, history = [], sessionUser = SESSION_USER, agentId = 'kai') {
   // System prompt built fresh each request — reflects latest MEMORY.md, daily notes, etc.
   const systemPrompt = buildSystemPrompt();
 
@@ -119,6 +121,9 @@ async function streamToOpenClaw(message, res, history = [], sessionUser = SESSIO
     stream: true,
   });
 
+  // Determine which agent ID to use in OpenClaw request
+  const openclawAgentId = agentId === 'po-kai' ? 'po-kai' : 'pwa';
+
   const options = {
     hostname: OPENCLAW_HOST,
     port: 18789,
@@ -128,7 +133,7 @@ async function streamToOpenClaw(message, res, history = [], sessionUser = SESSIO
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(body),
       'Authorization': `Bearer ${OPENCLAW_TOKEN}`,
-      'x-openclaw-agent-id': 'pwa',
+      'x-openclaw-agent-id': openclawAgentId,
     },
   };
 
@@ -153,8 +158,8 @@ async function streamToOpenClaw(message, res, history = [], sessionUser = SESSIO
           if (raw === '[DONE]') {
             if (assistantText && !res.writableEnded) {
               const assistantMsg = db.prepare(
-                "INSERT INTO chat_messages (role, content) VALUES ('assistant', ?) RETURNING *"
-              ).get(assistantText);
+                "INSERT INTO chat_messages (role, content, agent_id) VALUES ('assistant', ?, ?) RETURNING *"
+              ).get(assistantText, agentId);
               broadcast({ type: 'chat_message', message: assistantMsg });
               res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
             } else if (!res.writableEnded) {
@@ -181,8 +186,8 @@ async function streamToOpenClaw(message, res, history = [], sessionUser = SESSIO
       proxyRes.on('end', () => {
         if (assistantText && !res.writableEnded) {
           const assistantMsg = db.prepare(
-            "INSERT INTO chat_messages (role, content) VALUES ('assistant', ?) RETURNING *"
-          ).get(assistantText);
+            "INSERT INTO chat_messages (role, content, agent_id) VALUES ('assistant', ?, ?) RETURNING *"
+          ).get(assistantText, agentId);
           broadcast({ type: 'chat_message', message: assistantMsg });
           res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
           res.end();
@@ -209,20 +214,22 @@ async function streamToOpenClaw(message, res, history = [], sessionUser = SESSIO
 
 // ── POST /api/chat/send — SSE streaming ───────────────────────────────────
 router.post('/send', async (req, res) => {
-  const { message } = req.body;
+  const { message, agentId } = req.body;
   if (!message?.trim()) {
     return res.status(400).json({ error: 'message required' });
   }
 
+  const agent = agentId || 'kai';
+
   // Load recent conversation history (last 40 messages = 20 turns) before saving current
   const history = db.prepare(
-    'SELECT role, content FROM chat_messages ORDER BY id DESC LIMIT 40'
-  ).all().reverse();
+    'SELECT role, content FROM chat_messages WHERE agent_id = ? ORDER BY id DESC LIMIT 40'
+  ).all(agent).reverse();
 
   // Save user message
   const userMsg = db.prepare(
-    "INSERT INTO chat_messages (role, content) VALUES ('user', ?) RETURNING *"
-  ).get(message.trim());
+    "INSERT INTO chat_messages (role, content, agent_id) VALUES ('user', ?, ?) RETURNING *"
+  ).get(message.trim(), agent);
 
   // Broadcast to other connected clients
   broadcast({ type: 'chat_message', message: userMsg });
@@ -239,7 +246,7 @@ router.post('/send', async (req, res) => {
 
   // Stream response from OpenClaw (with history for conversational context)
   try {
-    await streamToOpenClaw(message.trim(), res, history);
+    await streamToOpenClaw(message.trim(), res, history, SESSION_USER, agent);
   } catch (err) {
     console.error('Error streaming response:', err);
   }
@@ -291,6 +298,8 @@ router.post('/send-audio', upload.single('audio'), async (req, res) => {
     return res.status(400).json({ error: 'audio file required' });
   }
 
+  const agentId = req.body.agentId || 'kai';
+
   // Transcribe audio
   let transcript;
   try {
@@ -306,13 +315,13 @@ router.post('/send-audio', upload.single('audio'), async (req, res) => {
 
   // Load recent conversation history before saving current
   const history = db.prepare(
-    'SELECT role, content FROM chat_messages ORDER BY id DESC LIMIT 40'
-  ).all().reverse();
+    'SELECT role, content FROM chat_messages WHERE agent_id = ? ORDER BY id DESC LIMIT 40'
+  ).all(agentId).reverse();
 
   // Save user message with transcript
   const userMsg = db.prepare(
-    "INSERT INTO chat_messages (role, content) VALUES ('user', ?) RETURNING *"
-  ).get(transcript.trim());
+    "INSERT INTO chat_messages (role, content, agent_id) VALUES ('user', ?, ?) RETURNING *"
+  ).get(transcript.trim(), agentId);
 
   // Broadcast to other connected clients
   broadcast({ type: 'chat_message', message: userMsg });
@@ -332,7 +341,7 @@ router.post('/send-audio', upload.single('audio'), async (req, res) => {
 
   // Stream response from OpenClaw (with history for conversational context)
   try {
-    await streamToOpenClaw(transcript.trim(), res, history);
+    await streamToOpenClaw(transcript.trim(), res, history, SESSION_USER, agentId);
   } catch (err) {
     console.error('Error streaming response:', err);
   }
@@ -345,6 +354,7 @@ router.post('/send-image', upload.single('image'), async (req, res) => {
   }
 
   const caption = (req.body.message || '').trim();
+  const agentId = req.body.agentId || 'kai';
   const mediaType = req.file.mimetype || 'image/jpeg';
 
   // Validate image mime type
@@ -353,22 +363,36 @@ router.post('/send-image', upload.single('image'), async (req, res) => {
     return res.status(400).json({ error: `Tipo de imagen no soportado: ${mediaType}` });
   }
 
-  // Encode image as base64 for vision API (no temp files, no tool calling required)
-  const base64Image = req.file.buffer.toString('base64');
-  const imageDataUrl = `data:${mediaType};base64,${base64Image}`;
+  // Save image to workspace/tmp so OpenClaw can read it via the Read tool
+  // IMPORTANT: imgPath must use the HOST filesystem path (not the Docker-internal /workspace mount)
+  // because the OpenClaw agent runs on the host and reads files from there.
+  const ext = mediaType.split('/')[1] || 'png';
+  const imgFilename = `kai_img_${Date.now()}.${ext}`;
+  const WORKSPACE_DOCKER = '/workspace'; // docker volume mount (used to save file inside container)
+  const WORKSPACE_HOST   = '/home/kai/.openclaw/workspace'; // host path (what OpenClaw reads)
+  const imgPathDocker = path.join(WORKSPACE_DOCKER, 'tmp', imgFilename);
+  const imgPath       = path.join(WORKSPACE_HOST,   'tmp', imgFilename); // sent to OpenClaw prompt
+
+  try {
+    fs.mkdirSync(path.join(WORKSPACE_DOCKER, 'tmp'), { recursive: true });
+    fs.writeFileSync(imgPathDocker, req.file.buffer);
+  } catch (err) {
+    console.error('[chat/image] Error saving image to disk:', err.message);
+    return res.status(500).json({ error: 'No se pudo guardar la imagen' });
+  }
 
   // The text stored in DB (no binary data)
   const dbContent = caption ? `[Imagen] ${caption}` : '[Imagen]';
 
   // Load recent history
   const history = db.prepare(
-    'SELECT role, content FROM chat_messages ORDER BY id DESC LIMIT 40'
-  ).all().reverse();
+    'SELECT role, content FROM chat_messages WHERE agent_id = ? ORDER BY id DESC LIMIT 40'
+  ).all(agentId).reverse();
 
   // Save user message
   const userMsg = db.prepare(
-    "INSERT INTO chat_messages (role, content) VALUES ('user', ?) RETURNING *"
-  ).get(dbContent);
+    "INSERT INTO chat_messages (role, content, agent_id) VALUES ('user', ?, ?) RETURNING *"
+  ).get(dbContent, agentId);
 
   broadcast({ type: 'chat_message', message: userMsg });
 
@@ -382,24 +406,23 @@ router.post('/send-image', upload.single('image'), async (req, res) => {
   // Emit user message id so client can map the optimistic message
   res.write(`data: ${JSON.stringify({ type: 'user_message', message: userMsg })}\n\n`);
 
-  // Build multimodal content array — Claude vision API (base64, no tool calling needed)
-  const userContent = [
-    {
-      type: 'image_url',
-      image_url: { url: imageDataUrl },
-    },
-    {
-      type: 'text',
-      text: caption || 'Describe esta imagen en detalle.',
-    },
-  ];
+  // Build text message pointing to the saved image.
+  // OpenClaw agent runs on the host — imgPath uses the host filesystem path so the Read tool works.
+  const imagePrompt = caption
+    ? `El usuario ha enviado una imagen con el siguiente mensaje: "${caption}"\n\nUsa la herramienta Read para leer y analizar la imagen en: ${imgPath}\n\nResponde al mensaje del usuario basándote en lo que ves en la imagen.`
+    : `El usuario ha enviado una imagen. Usa la herramienta Read para leerla en: ${imgPath}\n\nAnaliza y describe la imagen en detalle en tu respuesta.`;
 
-  // Stream vision response via multimodal content
+  // Stream vision response — OpenClaw reads the image via Read tool
   try {
-    await streamWithContent(userContent, res, history);
+    await streamToOpenClaw(imagePrompt, res, history, SESSION_USER, agentId);
   } catch (err) {
     console.error('Error streaming image response:', err);
   }
+
+  // Cleanup image after response (async, non-blocking)
+  setTimeout(() => {
+    try { fs.unlinkSync(imgPathDocker); } catch { /* ignore */ }
+  }, 60000); // keep 60s for potential retries
 });
 
 /**
@@ -456,8 +479,8 @@ async function streamWithContent(userContent, res, history = []) {
           if (raw === '[DONE]') {
             if (assistantText && !res.writableEnded) {
               const assistantMsg = db.prepare(
-                "INSERT INTO chat_messages (role, content) VALUES ('assistant', ?) RETURNING *"
-              ).get(assistantText);
+                "INSERT INTO chat_messages (role, content, agent_id) VALUES ('assistant', ?, ?) RETURNING *"
+              ).get(assistantText, agentId);
               broadcast({ type: 'chat_message', message: assistantMsg });
               res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
             } else if (!res.writableEnded) {
@@ -482,8 +505,8 @@ async function streamWithContent(userContent, res, history = []) {
       proxyRes.on('end', () => {
         if (assistantText && !res.writableEnded) {
           const assistantMsg = db.prepare(
-            "INSERT INTO chat_messages (role, content) VALUES ('assistant', ?) RETURNING *"
-          ).get(assistantText);
+            "INSERT INTO chat_messages (role, content, agent_id) VALUES ('assistant', ?, ?) RETURNING *"
+          ).get(assistantText, agentId);
           broadcast({ type: 'chat_message', message: assistantMsg });
           res.write(`data: ${JSON.stringify({ type: 'done', message: assistantMsg })}\n\n`);
           res.end();

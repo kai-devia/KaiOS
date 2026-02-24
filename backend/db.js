@@ -62,6 +62,7 @@ db.exec(`
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     role       TEXT NOT NULL,   -- 'user' | 'assistant'
     content    TEXT NOT NULL,
+    agent_id   TEXT NOT NULL DEFAULT 'kai',  -- 'kai' | 'po-kai'
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -99,6 +100,8 @@ const alterMigrations = [
     pin_hash   TEXT DEFAULT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
+  // Multi-agent support: add agent_id column to chat_messages
+  `ALTER TABLE chat_messages ADD COLUMN agent_id TEXT NOT NULL DEFAULT 'kai'`,
 ];
 for (const sql of alterMigrations) {
   try { db.exec(sql); } catch { /* column already exists — ignore */ }

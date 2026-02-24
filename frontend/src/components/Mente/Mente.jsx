@@ -1,10 +1,14 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { Outlet, useOutletContext, useNavigate, useLocation } from 'react-router-dom';
+import { AgentContext } from '../../context/AgentContext';
 import FileTree from '../Layout/Sidebar/FileTree';
 import SearchBar from '../Layout/Sidebar/SearchBar';
 import styles from './Mente.module.css';
 
 export default function Mente() {
+  // Get agent context
+  const { agentId, agentEmoji, agentName } = useContext(AgentContext);
+
   // Inherit everything from Layout's outlet context
   const parentContext = useOutletContext() || {};
   const { tree, files, refresh, success, info, error } = parentContext;
@@ -38,6 +42,9 @@ export default function Mente() {
     info,
     error,
     basePath: '/mente',
+    agentId,
+    agentName,
+    agentEmoji,
   };
 
   return (

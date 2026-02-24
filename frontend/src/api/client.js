@@ -99,20 +99,24 @@ export async function logoutServer() {
 
 // ─── Files API ───────────────────────────────────────────────────────────────
 
-export async function getFileTree() {
-  return request('/files');
+export async function getFileTree(agentId) {
+  const query = agentId ? `?agentId=${agentId}` : '';
+  return request(`/files${query}`);
 }
 
-export async function getFileList() {
-  return request('/files/flat');
+export async function getFileList(agentId) {
+  const query = agentId ? `?agentId=${agentId}` : '';
+  return request(`/files/flat${query}`);
 }
 
-export async function getFileContent(path) {
-  return request(`/files/content?path=${encodeURIComponent(path)}`);
+export async function getFileContent(path, agentId) {
+  const query = `path=${encodeURIComponent(path)}${agentId ? `&agentId=${agentId}` : ''}`;
+  return request(`/files/content?${query}`);
 }
 
-export async function saveFileContent(path, content) {
-  return request(`/files/content?path=${encodeURIComponent(path)}`, {
+export async function saveFileContent(path, content, agentId) {
+  const query = `path=${encodeURIComponent(path)}${agentId ? `&agentId=${agentId}` : ''}`;
+  return request(`/files/content?${query}`, {
     method: 'PUT',
     body: JSON.stringify({ content }),
   });

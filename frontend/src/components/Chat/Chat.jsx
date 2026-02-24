@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useContext } from 'react';
 import { ImagePlus, X } from 'lucide-react';
 import { getToken } from '../../api/client';
+import { AgentContext } from '../../context/AgentContext';
 import { marked } from 'marked';
 import {
   TypingIndicator,
@@ -19,6 +20,8 @@ const API_BASE = '/api';
 marked.setOptions({ breaks: true, gfm: true });
 
 export default function Chat() {
+  // ── Agent context ──────────────────────────────────────────────────────
+  const { agentId } = useContext(AgentContext);
   // ── State ──────────────────────────────────────────────────────────────
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -123,7 +126,7 @@ export default function Chat() {
   }, []);
 
   useEffect(() => {
-    fetch(`${API_BASE}/chat/history`, {
+    fetch(`${API_BASE}/chat/history?agentId=${agentId}`, {
       headers: { Authorization: `Bearer ${getToken()}` },
     })
       .then((r) => r.json())
@@ -139,7 +142,7 @@ export default function Chat() {
         setError(err.message);
         setLoading(false);
       });
-  }, []);
+  }, [agentId]);
 
   // ── Queue Processing ───────────────────────────────────────────────────
 
@@ -158,7 +161,7 @@ export default function Chat() {
     setError(null);
 
     try {
-      await sendSSE(text);
+      await sendSSE(text, agentId);
     } catch (err) {
       if (err.name === 'AbortError') {
         // Re-enqueue batch + new messages for combined response
@@ -220,6 +223,7 @@ export default function Chat() {
 
     const formData = new FormData();
     formData.append('audio', audioBlob, 'audio.webm');
+    formData.append('agentId', agentId);
 
     // Optimistic update: mostrar como si enviara un mensaje
     setMessages((prev) => [
@@ -359,6 +363,7 @@ export default function Chat() {
     const formData = new FormData();
     formData.append('image', savedFile, savedFile.name);
     if (caption) formData.append('message', caption);
+    formData.append('agentId', agentId);
 
     try {
       const res = await fetch(`${API_BASE}/chat/send-image`, {
@@ -436,7 +441,7 @@ export default function Chat() {
 
   const clearHistory = async () => {
     if (!window.confirm('¿Borrar todo el historial?')) return;
-    await fetch(`${API_BASE}/chat/history`, {
+    await fetch(`${API_BASE}/chat/history?agentId=${agentId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${getToken()}` },
     });

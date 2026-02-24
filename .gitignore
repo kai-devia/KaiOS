@@ -24,3 +24,9 @@ Thumbs.db
 
 # Coverage
 coverage/
+
+# Database
+data/
+*.db
+*.db-wal
+*.db-shm

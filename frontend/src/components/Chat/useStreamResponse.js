@@ -18,7 +18,7 @@ export function useStreamResponse(onDelta, onDone, onError) {
   }, []);
 
   const sendRequest = useCallback(
-    async (message) => {
+    async (message, agentId = 'kai') => {
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
@@ -29,7 +29,7 @@ export function useStreamResponse(onDelta, onDone, onError) {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${getToken()}`,
           },
-          body: JSON.stringify({ message }),
+          body: JSON.stringify({ message, agentId }),
           signal: controller.signal,
         });
 

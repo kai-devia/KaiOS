@@ -15,7 +15,16 @@
   min-width: 70px;
 }
 
-/* Logo / toggle button */
+/* Logo section */
+.logoSection {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-bottom: 1px solid var(--border);
+  position: relative;
+}
+
+/* Logo / agent picker button */
 .logoBtn {
   display: flex;
   align-items: center;
@@ -23,9 +32,8 @@
   padding: 16px;
   background: none;
   border: none;
-  border-bottom: 1px solid var(--border);
   cursor: pointer;
-  width: 100%;
+  flex: 1;
   color: var(--text-primary);
   transition: background var(--transition);
   white-space: nowrap;
@@ -41,13 +49,48 @@
   border-radius: 6px;
 }
 
+.agentEmoji {
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+
 .logoText {
   font-weight: 700;
-  font-size: 1rem;
-  letter-spacing: 0.1em;
+  font-size: 0.9rem;
+  letter-spacing: 0.05em;
   color: var(--accent);
   overflow: hidden;
   white-space: nowrap;
+}
+
+/* Collapse/expand button */
+.toggleBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 56px;
+  background: none;
+  border: none;
+  border-left: 1px solid var(--border);
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: color var(--transition), background var(--transition);
+  flex-shrink: 0;
+}
+
+.toggleBtn:hover {
+  color: var(--text-primary);
+  background: var(--bg-card);
+}
+
+/* Agent picker popover */
+.pickerContainer {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  z-index: 1000;
 }
 
 /* Nav items */

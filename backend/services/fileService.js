@@ -28,15 +28,15 @@ const PRIORITY_FILES = [
 /**
  * Check if a path is safe (within workspace root)
  */
-function isSafePath(relativePath) {
-  const resolved = path.resolve(workspaceRoot, relativePath);
-  return resolved.startsWith(workspaceRoot) && !relativePath.includes('..');
+function isSafePath(relativePath, root = workspaceRoot) {
+  const resolved = path.resolve(root, relativePath);
+  return resolved.startsWith(root) && !relativePath.includes('..');
 }
 
 /**
  * Recursively build file tree
  */
-async function buildTree(dir, relativePath = '') {
+async function buildTree(dir, relativePath = '', root = workspaceRoot) {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const items = [];
 
@@ -48,7 +48,7 @@ async function buildTree(dir, relativePath = '') {
     if (EXCLUDED.has(name)) continue;
 
     if (entry.isDirectory()) {
-      const children = await buildTree(path.join(dir, name), entryRelPath);
+      const children = await buildTree(path.join(dir, name), entryRelPath, root);
       // Only include directories that have .md files (directly or nested)
       if (children.length > 0) {
         items.push({
@@ -113,8 +113,8 @@ function sortTree(items) {
 /**
  * Get file tree
  */
-async function getFileTree() {
-  const tree = await buildTree(workspaceRoot);
+async function getFileTree(root = workspaceRoot) {
+  const tree = await buildTree(root, '', root);
   return sortTree(tree);
 }
 
@@ -135,12 +135,12 @@ function flattenTree(items, result = []) {
 /**
  * Get file content
  */
-async function getFileContent(relativePath) {
-  if (!isSafePath(relativePath)) {
+async function getFileContent(relativePath, root = workspaceRoot) {
+  if (!isSafePath(relativePath, root)) {
     throw new Error('Ruta no permitida');
   }
 
-  const fullPath = path.join(workspaceRoot, relativePath);
+  const fullPath = path.join(root, relativePath);
   const content = await fs.readFile(fullPath, 'utf-8');
   const stat = await fs.stat(fullPath);
 
@@ -153,8 +153,8 @@ async function getFileContent(relativePath) {
 /**
  * Write file content
  */
-async function writeFileContent(relativePath, content) {
-  if (!isSafePath(relativePath)) {
+async function writeFileContent(relativePath, content, root = workspaceRoot) {
+  if (!isSafePath(relativePath, root)) {
     throw new Error('Ruta no permitida');
   }
 
@@ -162,7 +162,7 @@ async function writeFileContent(relativePath, content) {
     throw new Error('Solo se pueden editar archivos .md');
   }
 
-  const fullPath = path.join(workspaceRoot, relativePath);
+  const fullPath = path.join(root, relativePath);
   await fs.writeFile(fullPath, content, 'utf-8');
 
   return { ok: true };

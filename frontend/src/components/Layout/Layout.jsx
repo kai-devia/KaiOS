@@ -1,5 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useContext } from 'react';
 import { Outlet } from 'react-router-dom';
+import { AgentContext } from '../../context/AgentContext';
 import Header from './Header/Header';
 import NavSidebar from '../Navigation/NavSidebar';
 import BottomNav from '../Navigation/BottomNav';
@@ -11,7 +12,8 @@ import styles from './Layout.module.css';
 
 export default function Layout() {
   const [navCollapsed, setNavCollapsed] = useState(true); // starts collapsed (icon-only)
-  const { tree, files, refresh } = useFiles();
+  const { agentId } = useContext(AgentContext);
+  const { tree, files, refresh } = useFiles(agentId);
   const { toasts, success, info, error } = useToast();
 
   const handleWsMessage = useCallback((msg) => {

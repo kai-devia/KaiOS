@@ -9,22 +9,48 @@
   flex-shrink: 0;
 }
 
-/* KAI title — hidden on desktop since NavSidebar shows the logo */
-.title {
+/* Title section with agent selector — hidden on desktop since NavSidebar shows the logo */
+.titleSection {
   display: none;
+  position: relative;
+}
+
+.titleBtn {
+  display: flex;
   align-items: center;
   gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: var(--text-primary);
+  transition: color var(--transition);
+}
+
+.titleBtn:hover {
+  color: var(--accent);
 }
 
 .logo {
   border-radius: 6px;
 }
 
+.emoji {
+  font-size: 1.1rem;
+}
+
 .text {
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.95rem;
   color: var(--text-primary);
-  letter-spacing: 0.08em;
+  letter-spacing: 0.05em;
+}
+
+.pickerContainer {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 1000;
 }
 
 .actions {
@@ -52,10 +78,10 @@
   background: var(--bg-base);
 }
 
-/* On mobile: show KAI title in header */
+/* On mobile: show title section in header */
 @media (max-width: 768px) {
-  .title {
-    display: flex;
+  .titleSection {
+    display: block;
   }
 
   .header {

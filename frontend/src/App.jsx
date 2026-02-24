@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { isAuthenticated } from './api/client';
+import { AgentContextProvider } from './context/AgentContext';
 import Login from './components/Login/Login';
 import Layout from './components/Layout/Layout';
 
@@ -59,7 +60,9 @@ export default function App() {
         path="/"
         element={
           <ProtectedRoute>
-            <Layout />
+            <AgentContextProvider>
+              <Layout />
+            </AgentContextProvider>
           </ProtectedRoute>
         }
       >
