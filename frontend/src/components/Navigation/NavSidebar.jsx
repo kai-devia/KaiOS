@@ -72,7 +72,7 @@ export default function NavSidebar({ collapsed, onToggle }) {
           title={`Modo: ${agentName}`}
         >
           {collapsed
-            ? <span className={styles.modeAbbr}>{agentName.slice(0, 2).toUpperCase()}</span>
+            ? <span className={styles.modeAbbr}>{agentName.toUpperCase()}</span>
             : <span className={styles.modeLabel}>{agentName}</span>
           }
         </div>
