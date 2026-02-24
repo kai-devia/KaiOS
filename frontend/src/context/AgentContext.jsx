@@ -3,8 +3,8 @@ import { createContext, useState, useEffect } from 'react';
 export const AgentContext = createContext();
 
 const AGENTS = [
-  { id: 'kai', name: 'Kai', emoji: '🤖' },
-  { id: 'po-kai', name: 'PO-Kai', emoji: '🧩' },
+  { id: 'kai', name: 'CORE' },
+  { id: 'po-kai', name: 'PO' },
 ];
 
 export function AgentContextProvider({ children }) {
@@ -33,7 +33,6 @@ export function AgentContextProvider({ children }) {
       value={{
         agentId,
         agentName: agent.name,
-        agentEmoji: agent.emoji,
         setAgent,
         agents: AGENTS,
       }}

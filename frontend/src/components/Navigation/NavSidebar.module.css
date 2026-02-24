@@ -19,39 +19,22 @@
 .logoSection {
   display: flex;
   align-items: center;
-  gap: 0;
   border-bottom: 1px solid var(--border);
-  position: relative;
+  height: 56px;
 }
 
-/* Logo / agent picker button */
-.logoBtn {
+.logoMark {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 16px;
-  background: none;
-  border: none;
-  cursor: pointer;
+  padding: 0 16px;
   flex: 1;
-  color: var(--text-primary);
-  transition: background var(--transition);
-  white-space: nowrap;
   overflow: hidden;
-}
-
-.logoBtn:hover {
-  background: var(--bg-card);
 }
 
 .logo {
   flex-shrink: 0;
   border-radius: 6px;
-}
-
-.agentEmoji {
-  font-size: 1.2rem;
-  flex-shrink: 0;
 }
 
 .logoText {
@@ -84,13 +67,37 @@
   background: var(--bg-card);
 }
 
-/* Agent picker popover */
-.pickerContainer {
-  position: absolute;
-  top: 100%;
-  left: 0;
-  margin-top: 4px;
-  z-index: 1000;
+/* Mode switcher (CORE / PO) */
+.modeSwitcher {
+  display: flex;
+  gap: 6px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.modeBtn {
+  flex: 1;
+  padding: 5px 0;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: color var(--transition), background var(--transition), border-color var(--transition);
+}
+
+.modeBtn:hover {
+  color: var(--text-primary);
+  border-color: var(--text-secondary);
+}
+
+.modeBtn.modeActive {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
 /* Nav items */
