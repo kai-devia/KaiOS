@@ -74,10 +74,9 @@
   border-bottom: 1px solid var(--border);
 }
 
+/* Hidden when collapsed — no room, no overflow issues */
 .modeSectionCollapsed {
-  padding: 8px 0;
-  display: flex;
-  justify-content: center;
+  display: none;
 }
 
 /* No border, no background — just plain text, clickable */
@@ -117,11 +116,7 @@
   overflow: hidden;
 }
 
-.modeDropdownCollapsed {
-  left: 4px;
-  right: auto;
-  width: 110px;
-}
+/* modeDropdownCollapsed: not needed — selector hidden in collapsed mode */
 
 .modeOption {
   display: block;
