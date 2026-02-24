@@ -144,7 +144,10 @@
 }
 
 .modeOption {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   width: 100%;
   padding: 9px 16px;
   background: none;
@@ -153,7 +156,6 @@
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.06em;
-  text-align: center;
   cursor: pointer;
   transition: color var(--transition), background var(--transition);
   white-space: nowrap;
@@ -167,6 +169,44 @@
 .modeOption.modeOptionActive {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.modeOptionLabel {
+  flex: 1;
+  text-align: center;
+}
+
+/* Color dot — círculo clicable que abre el color picker nativo */
+.colorDot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.2);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.colorDot:hover {
+  transform: scale(1.2);
+  border-color: rgba(255,255,255,0.5);
+}
+
+/* El input color real, invisible, superpuesto sobre el dot */
+.colorInput {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  padding: 0;
+  border: none;
 }
 
 /* ── Nav items ── */
