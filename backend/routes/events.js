@@ -11,12 +11,17 @@ const ALLOWED_FIELDS = [
   'schedule', 'last_run', 'updated_at',
 ];
 
+const VALID_MODES = ['CORE', 'PO'];
+
 // ─── GET /api/events ─────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
   try {
+    const { mode } = req.query;
+    const m = VALID_MODES.includes(mode) ? mode : 'CORE';
+
     const events = db.prepare(
-      'SELECT * FROM events ORDER BY created_at DESC'
-    ).all();
+      'SELECT * FROM events WHERE mode = ? ORDER BY created_at DESC'
+    ).all(m);
     res.json(events);
   } catch (err) {
     console.error('GET /api/events error:', err);
@@ -38,22 +43,25 @@ router.get('/:id', (req, res) => {
 // ─── POST /api/events ────────────────────────────────────────────────────────
 router.post('/', (req, res) => {
   try {
-    const { name, description, status, owner, notify, schedule } = req.body;
+    const { name, description, status, owner, notify, schedule, mode } = req.body;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ error: 'El nombre es requerido' });
     }
 
+    const m = VALID_MODES.includes(mode) ? mode : 'CORE';
+
     const result = db.prepare(`
-      INSERT INTO events (name, description, status, owner, notify, schedule)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO events (name, description, status, owner, notify, schedule, mode)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `).run(
       name.trim(),
       description || '',
       status || 'FINALIZADO',
       owner || 'Kai',
       notify || 'NO',
-      schedule || ''
+      schedule || '',
+      m
     );
 
     const event = db.prepare('SELECT * FROM events WHERE id = ?').get(result.lastInsertRowid);
@@ -71,6 +79,9 @@ router.patch('/:id', (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Evento no encontrado' });
 
     const updates = { ...req.body };
+    // Don't allow changing mode after creation
+    delete updates.mode;
+
     updates.updated_at = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
     const fields = Object.keys(updates).filter(k => ALLOWED_FIELDS.includes(k));

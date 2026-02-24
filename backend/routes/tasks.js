@@ -11,19 +11,23 @@ const ALLOWED_FIELDS = [
   'task_type', 'project', 'assignee', 'started_at', 'finished_at', 'updated_at',
 ];
 
+const VALID_MODES = ['CORE', 'PO'];
+
 // ─── GET /api/tasks ─────────────────────────────────────────────────────────
 router.get('/', (req, res) => {
   try {
-    const { status } = req.query;
+    const { status, mode } = req.query;
+    const m = VALID_MODES.includes(mode) ? mode : 'CORE';
+
     let tasks;
     if (status) {
       tasks = db.prepare(
-        'SELECT * FROM tasks WHERE status = ? ORDER BY created_at DESC'
-      ).all(status);
+        'SELECT * FROM tasks WHERE status = ? AND mode = ? ORDER BY created_at DESC'
+      ).all(status, m);
     } else {
       tasks = db.prepare(
-        'SELECT * FROM tasks ORDER BY created_at DESC'
-      ).all();
+        'SELECT * FROM tasks WHERE mode = ? ORDER BY created_at DESC'
+      ).all(m);
     }
     res.json(tasks);
   } catch (err) {
@@ -46,15 +50,17 @@ router.get('/:id', (req, res) => {
 // ─── POST /api/tasks ─────────────────────────────────────────────────────────
 router.post('/', (req, res) => {
   try {
-    const { title, description, status, priority, effort, task_type, project, assignee } = req.body;
+    const { title, description, status, priority, effort, task_type, project, assignee, mode } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ error: 'El título es requerido' });
     }
 
+    const m = VALID_MODES.includes(mode) ? mode : 'CORE';
+
     const result = db.prepare(`
-      INSERT INTO tasks (title, description, status, priority, effort, task_type, project, assignee)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tasks (title, description, status, priority, effort, task_type, project, assignee, mode)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       title.trim(),
       description || '',
@@ -63,7 +69,8 @@ router.post('/', (req, res) => {
       effort || 'Medio',
       task_type || '',
       project || '',
-      assignee || ''
+      assignee || '',
+      m
     );
 
     const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(result.lastInsertRowid);
@@ -81,6 +88,9 @@ router.patch('/:id', (req, res) => {
     if (!existing) return res.status(404).json({ error: 'Tarea no encontrada' });
 
     const updates = { ...req.body };
+    // Don't allow changing mode after creation
+    delete updates.mode;
+
     const now = new Date().toISOString().replace('T', ' ').slice(0, 19);
 
     // Auto-fill started_at when moving to EN PROGRESO

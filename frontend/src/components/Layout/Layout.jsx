@@ -12,7 +12,7 @@ import styles from './Layout.module.css';
 
 export default function Layout() {
   const [navCollapsed, setNavCollapsed] = useState(true); // starts collapsed (icon-only)
-  const { agentId } = useContext(AgentContext);
+  const { agentId, agentName } = useContext(AgentContext);
   const { tree, files, refresh } = useFiles(agentId);
   const { toasts, success, info, error } = useToast();
 
@@ -32,7 +32,7 @@ export default function Layout() {
   const { isConnected } = useWebSocket(handleWsMessage);
 
   return (
-    <div className={styles.layout}>
+    <div className={styles.layout} data-mode={agentName}>
       {/* Main navigation sidebar (desktop) */}
       <NavSidebar
         collapsed={navCollapsed}

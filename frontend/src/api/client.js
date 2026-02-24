@@ -124,19 +124,20 @@ export async function saveFileContent(path, content, agentId) {
 
 // ─── Tasks API ───────────────────────────────────────────────────────────────
 
-export async function getTasks(status) {
-  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
-  return request(`/tasks${qs}`);
+export async function getTasks(status, mode = 'CORE') {
+  const params = new URLSearchParams({ mode });
+  if (status) params.set('status', status);
+  return request(`/tasks?${params}`);
 }
 
 export async function getTask(id) {
   return request(`/tasks/${id}`);
 }
 
-export async function createTask(data) {
+export async function createTask(data, mode = 'CORE') {
   return request('/tasks', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, mode }),
   });
 }
 
@@ -153,18 +154,18 @@ export async function deleteTask(id) {
 
 // ─── Events API ──────────────────────────────────────────────────────────────
 
-export async function getEvents() {
-  return request('/events');
+export async function getEvents(mode = 'CORE') {
+  return request(`/events?mode=${mode}`);
 }
 
 export async function getEvent(id) {
   return request(`/events/${id}`);
 }
 
-export async function createEvent(data) {
+export async function createEvent(data, mode = 'CORE') {
   return request('/events', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, mode }),
   });
 }
 
@@ -177,4 +178,42 @@ export async function updateEvent(id, data) {
 
 export async function deleteEvent(id) {
   return request(`/events/${id}`, { method: 'DELETE' });
+}
+
+// ─── Vault API ───────────────────────────────────────────────────────────────
+
+export async function getVaultStatus(mode = 'CORE') {
+  return request(`/vault/status?mode=${mode}`);
+}
+
+export async function setupVaultPin(pin, mode = 'CORE') {
+  return request('/vault/setup-pin', {
+    method: 'POST',
+    body: JSON.stringify({ pin, mode }),
+  });
+}
+
+export async function verifyVaultPin(pin, mode = 'CORE') {
+  return request('/vault/verify-pin', {
+    method: 'POST',
+    body: JSON.stringify({ pin, mode }),
+  });
+}
+
+export async function getVaultEntries(mode = 'CORE') {
+  return request(`/vault/entries?mode=${mode}`);
+}
+
+export async function revealVaultEntry(key, pin, mode = 'CORE') {
+  return request('/vault/reveal', {
+    method: 'POST',
+    body: JSON.stringify({ key, pin, mode }),
+  });
+}
+
+export async function updateVaultEntry(key, value, pin, mode = 'CORE') {
+  return request(`/vault/entries/${encodeURIComponent(key)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ value, pin, mode }),
+  });
 }

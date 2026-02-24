@@ -102,6 +102,15 @@ const alterMigrations = [
   )`,
   // Multi-agent support: add agent_id column to chat_messages
   `ALTER TABLE chat_messages ADD COLUMN agent_id TEXT NOT NULL DEFAULT 'kai'`,
+  // Mode isolation: add mode column to tasks and events
+  `ALTER TABLE tasks ADD COLUMN mode TEXT NOT NULL DEFAULT 'CORE'`,
+  `ALTER TABLE events ADD COLUMN mode TEXT NOT NULL DEFAULT 'CORE'`,
+  // Vault PIN for PO mode (separate table — vault_config has CHECK(id=1))
+  `CREATE TABLE IF NOT EXISTS vault_config_po (
+    id         INTEGER PRIMARY KEY CHECK (id = 1),
+    pin_hash   TEXT DEFAULT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
 ];
 for (const sql of alterMigrations) {
   try { db.exec(sql); } catch { /* column already exists — ignore */ }

@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
 import { getTasks, createTask, updateTask, deleteTask } from '../../api/client';
+import { AgentContext } from '../../context/AgentContext';
 import TaskModal from './TaskModal';
 import styles from './Tasks.module.css';
 
@@ -52,6 +53,9 @@ function PriorityDot({ priority }) {
 }
 
 export default function TasksBoard() {
+  const { agentName } = useContext(AgentContext);
+  const mode = agentName; // 'CORE' | 'PO'
+
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -61,14 +65,14 @@ export default function TasksBoard() {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const data = await getTasks();
+      const data = await getTasks(undefined, mode);
       setTasks(data);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mode]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -77,7 +81,7 @@ export default function TasksBoard() {
       const updated = await updateTask(modal.task.id, form);
       setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
     } else {
-      const created = await createTask(form);
+      const created = await createTask(form, mode);
       setTasks((prev) => [created, ...prev]);
     }
     setModal(null);

@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
 import { Eye, EyeOff, Lock, Pencil, Check, X, KeyRound, ShieldCheck } from 'lucide-react';
 import { getToken } from '../../api/client';
+import { AgentContext } from '../../context/AgentContext';
 import styles from './Vault.module.css';
 
 const API = '/api/vault';
@@ -19,10 +20,14 @@ async function vaultFetch(endpoint, options = {}) {
   return data;
 }
 
-// PIN is kept in sessionStorage so navigating away and back doesn't require re-entering
-const SESSION_KEY = 'vault-pin-session';
+// PIN is kept in sessionStorage per mode so navigating away and back doesn't require re-entering
+function sessionKey(mode) { return `vault-pin-session-${mode}`; }
 
 export default function Vault() {
+  const { agentName } = useContext(AgentContext);
+  const mode = agentName; // 'CORE' | 'PO'
+  const SK = sessionKey(mode);
+
   const [status, setStatus] = useState('loading'); // loading | setup | locked | unlocked
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
@@ -33,20 +38,25 @@ export default function Vault() {
   const [loading, setLoading] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  // Check if PIN is configured and if we have a session
+  // Re-check vault when mode changes
   useEffect(() => {
+    setStatus('loading');
+    setEntries([]);
+    setRevealed({});
+    setEditingKey(null);
+    setPin('');
+
     (async () => {
       try {
-        const { pinConfigured } = await vaultFetch('/status');
+        const { pinConfigured } = await vaultFetch(`/status?mode=${mode}`);
         if (!pinConfigured) {
           setStatus('setup');
         } else {
-          // Check session PIN
-          const sessionPin = sessionStorage.getItem(SESSION_KEY);
+          const sessionPin = sessionStorage.getItem(SK);
           if (sessionPin) {
             const { valid } = await vaultFetch('/verify-pin', {
               method: 'POST',
-              body: JSON.stringify({ pin: sessionPin }),
+              body: JSON.stringify({ pin: sessionPin, mode }),
             });
             if (valid) {
               setPin(sessionPin);
@@ -54,28 +64,25 @@ export default function Vault() {
               loadEntries();
               return;
             } else {
-              sessionStorage.removeItem(SESSION_KEY);
+              sessionStorage.removeItem(SK);
             }
           }
           setStatus('locked');
         }
-      } catch (err) {
+      } catch {
         setStatus('locked');
       }
     })();
 
-    // Auto-lock when navigating away from Vault
-    return () => {
-      sessionStorage.removeItem(SESSION_KEY);
-    };
-  }, []);
+    return () => { sessionStorage.removeItem(SK); };
+  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadEntries = useCallback(async () => {
     try {
-      const { entries } = await vaultFetch('/entries');
+      const { entries } = await vaultFetch(`/entries?mode=${mode}`);
       setEntries(entries || []);
     } catch {}
-  }, []);
+  }, [mode]);
 
   const handleSetupPin = async () => {
     if (pin.length < 4) return setPinError('Mínimo 4 dígitos');
@@ -84,9 +91,9 @@ export default function Vault() {
     try {
       await vaultFetch('/setup-pin', {
         method: 'POST',
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ pin, mode }),
       });
-      sessionStorage.setItem(SESSION_KEY, pin);
+      sessionStorage.setItem(SK, pin);
       setStatus('unlocked');
       loadEntries();
     } catch (err) {
@@ -102,10 +109,10 @@ export default function Vault() {
     try {
       const { valid } = await vaultFetch('/verify-pin', {
         method: 'POST',
-        body: JSON.stringify({ pin }),
+        body: JSON.stringify({ pin, mode }),
       });
       if (valid) {
-        sessionStorage.setItem(SESSION_KEY, pin);
+        sessionStorage.setItem(SK, pin);
         setStatus('unlocked');
         loadEntries();
       } else {
@@ -119,7 +126,7 @@ export default function Vault() {
   };
 
   const handleLock = () => {
-    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(SK);
     setPin('');
     setRevealed({});
     setEditingKey(null);
@@ -128,15 +135,14 @@ export default function Vault() {
 
   const handleReveal = async (key) => {
     if (revealed[key]) {
-      // Hide
       setRevealed(prev => { const n = { ...prev }; delete n[key]; return n; });
       return;
     }
     try {
-      const sessionPin = sessionStorage.getItem(SESSION_KEY);
+      const sessionPin = sessionStorage.getItem(SK);
       const { value } = await vaultFetch('/reveal', {
         method: 'POST',
-        body: JSON.stringify({ key, pin: sessionPin }),
+        body: JSON.stringify({ key, pin: sessionPin, mode }),
       });
       setRevealed(prev => ({ ...prev, [key]: value }));
     } catch (err) {
@@ -145,11 +151,11 @@ export default function Vault() {
   };
 
   const handleEditStart = async (key) => {
-    const sessionPin = sessionStorage.getItem(SESSION_KEY);
+    const sessionPin = sessionStorage.getItem(SK);
     try {
       const { value } = await vaultFetch('/reveal', {
         method: 'POST',
-        body: JSON.stringify({ key, pin: sessionPin }),
+        body: JSON.stringify({ key, pin: sessionPin, mode }),
       });
       setEditValue(value);
       setEditingKey(key);
@@ -159,11 +165,11 @@ export default function Vault() {
 
   const handleEditSave = async (key) => {
     setSaveError('');
-    const sessionPin = sessionStorage.getItem(SESSION_KEY);
+    const sessionPin = sessionStorage.getItem(SK);
     try {
       await vaultFetch(`/entries/${encodeURIComponent(key)}`, {
         method: 'PATCH',
-        body: JSON.stringify({ value: editValue, pin: sessionPin }),
+        body: JSON.stringify({ value: editValue, pin: sessionPin, mode }),
       });
       setEditingKey(null);
       setRevealed(prev => { const n = { ...prev }; delete n[key]; return n; });

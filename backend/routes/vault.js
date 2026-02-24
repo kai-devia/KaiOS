@@ -9,7 +9,18 @@ const router = express.Router();
 // Protect all vault routes with JWT auth
 router.use(authMiddleware);
 
-const SECRETS_FILE = process.env.VAULT_SECRETS_PATH || '/app/vault-secrets/accounts.env';
+const SECRETS_DIR = process.env.VAULT_SECRETS_DIR || '/app/vault-secrets';
+const SECRETS_FILES = {
+  CORE: process.env.VAULT_SECRETS_PATH || `${SECRETS_DIR}/accounts.env`,
+  PO:   `${SECRETS_DIR}/po-secrets.env`,
+};
+
+const VALID_MODES = ['CORE', 'PO'];
+
+function resolveMode(req) {
+  const m = req.query.mode || req.body?.mode || 'CORE';
+  return VALID_MODES.includes(m) ? m : 'CORE';
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -17,14 +28,33 @@ function hashPin(pin) {
   return crypto.createHash('sha256').update(`vault-kai-2026:${pin}`).digest('hex');
 }
 
-function getVaultConfig() {
-  // Ensure table exists (idempotent)
+function getVaultConfig(mode) {
+  if (mode === 'PO') {
+    // Separate table for PO vault PIN
+    db.exec(`CREATE TABLE IF NOT EXISTS vault_config_po (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      pin_hash TEXT DEFAULT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`);
+    return db.prepare('SELECT * FROM vault_config_po WHERE id = 1').get() || null;
+  }
+  // CORE (default)
   db.exec(`CREATE TABLE IF NOT EXISTS vault_config (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     pin_hash TEXT DEFAULT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
   return db.prepare('SELECT * FROM vault_config WHERE id = 1').get() || null;
+}
+
+function saveVaultConfig(mode, pinHash) {
+  const table = mode === 'PO' ? 'vault_config_po' : 'vault_config';
+  const config = getVaultConfig(mode);
+  if (config) {
+    db.prepare(`UPDATE ${table} SET pin_hash = ? WHERE id = 1`).run(pinHash);
+  } else {
+    db.prepare(`INSERT INTO ${table} (id, pin_hash) VALUES (1, ?)`).run(pinHash);
+  }
 }
 
 /**
@@ -64,17 +94,23 @@ function maskValue(value) {
   return value.slice(0, 3) + '•'.repeat(Math.min(value.length - 3, 20));
 }
 
-function readSecretsFile() {
-  if (!fs.existsSync(SECRETS_FILE)) return '';
-  return fs.readFileSync(SECRETS_FILE, 'utf8');
+function getSecretsFilePath(mode) {
+  return SECRETS_FILES[mode] || SECRETS_FILES.CORE;
 }
 
-function writeSecretsFile(content) {
-  fs.writeFileSync(SECRETS_FILE, content, 'utf8');
+function readSecretsFile(mode) {
+  const filePath = getSecretsFilePath(mode);
+  if (!fs.existsSync(filePath)) return '';
+  return fs.readFileSync(filePath, 'utf8');
 }
 
-function updateKeyInFile(key, newValue) {
-  const content = readSecretsFile();
+function writeSecretsFile(content, mode) {
+  const filePath = getSecretsFilePath(mode);
+  fs.writeFileSync(filePath, content, 'utf8');
+}
+
+function updateKeyInFile(key, newValue, mode) {
+  const content = readSecretsFile(mode);
   const lines = content.split('\n');
   let found = false;
 
@@ -94,51 +130,46 @@ function updateKeyInFile(key, newValue) {
     updated.push(`${key}=${newValue}`);
   }
 
-  writeSecretsFile(updated.join('\n'));
+  writeSecretsFile(updated.join('\n'), mode);
 }
 
 // ── Routes ───────────────────────────────────────────────────────────────────
 
 /**
- * GET /api/vault/status
- * Returns whether PIN is configured
+ * GET /api/vault/status?mode=CORE|PO
+ * Returns whether PIN is configured for the given mode
  */
 router.get('/status', (req, res) => {
-  const config = getVaultConfig();
-  res.json({ pinConfigured: !!(config && config.pin_hash) });
+  const mode = resolveMode(req);
+  const config = getVaultConfig(mode);
+  res.json({ pinConfigured: !!(config && config.pin_hash), mode });
 });
 
 /**
  * POST /api/vault/setup-pin
- * Body: { pin: "1234" }
- * Sets PIN for the first time (or resets if no PIN was set)
+ * Body: { pin: "1234", mode: "CORE"|"PO" }
  */
 router.post('/setup-pin', (req, res) => {
   const { pin } = req.body;
+  const mode = resolveMode(req);
+
   if (!pin || pin.length < 4) {
     return res.status(400).json({ error: 'PIN debe tener al menos 4 dígitos' });
   }
 
-  const config = getVaultConfig();
   const pinHash = hashPin(String(pin));
-
-  if (config) {
-    db.prepare('UPDATE vault_config SET pin_hash = ? WHERE id = 1').run(pinHash);
-  } else {
-    db.prepare('INSERT INTO vault_config (id, pin_hash) VALUES (1, ?)').run(pinHash);
-  }
-
+  saveVaultConfig(mode, pinHash);
   res.json({ ok: true });
 });
 
 /**
  * POST /api/vault/verify-pin
- * Body: { pin: "1234" }
- * Returns { valid: true/false }
+ * Body: { pin: "1234", mode: "CORE"|"PO" }
  */
 router.post('/verify-pin', (req, res) => {
   const { pin } = req.body;
-  const config = getVaultConfig();
+  const mode = resolveMode(req);
+  const config = getVaultConfig(mode);
   if (!config || !config.pin_hash) {
     return res.status(400).json({ error: 'PIN no configurado' });
   }
@@ -147,11 +178,12 @@ router.post('/verify-pin', (req, res) => {
 });
 
 /**
- * GET /api/vault/entries
+ * GET /api/vault/entries?mode=CORE|PO
  * Returns entries with masked values (no PIN required — list is safe to show)
  */
 router.get('/entries', (req, res) => {
-  const content = readSecretsFile();
+  const mode = resolveMode(req);
+  const content = readSecretsFile(mode);
   const parsed = parseEnvFile(content);
 
   const entries = parsed.map(item => {
@@ -166,19 +198,19 @@ router.get('/entries', (req, res) => {
 
 /**
  * POST /api/vault/reveal
- * Body: { key: "GITHUB_TOKEN", pin: "1234" }
- * Returns real value if PIN is correct
+ * Body: { key: "GITHUB_TOKEN", pin: "1234", mode: "CORE"|"PO" }
  */
 router.post('/reveal', (req, res) => {
   const { key, pin } = req.body;
+  const mode = resolveMode(req);
   if (!key || !pin) return res.status(400).json({ error: 'key y pin requeridos' });
 
-  const config = getVaultConfig();
+  const config = getVaultConfig(mode);
   if (!config || config.pin_hash !== hashPin(String(pin))) {
     return res.status(403).json({ error: 'PIN incorrecto' });
   }
 
-  const content = readSecretsFile();
+  const content = readSecretsFile(mode);
   const parsed = parseEnvFile(content);
   const entry = parsed.find(e => e.type === 'entry' && e.key === key);
 
@@ -188,23 +220,23 @@ router.post('/reveal', (req, res) => {
 
 /**
  * PATCH /api/vault/entries/:key
- * Body: { value: "new-value", pin: "1234" }
- * Updates a key in the secrets file
+ * Body: { value: "new-value", pin: "1234", mode: "CORE"|"PO" }
  */
 router.patch('/entries/:key', (req, res) => {
   const { key } = req.params;
   const { value, pin } = req.body;
+  const mode = resolveMode(req);
 
   if (!pin) return res.status(400).json({ error: 'PIN requerido' });
   if (value === undefined) return res.status(400).json({ error: 'value requerido' });
 
-  const config = getVaultConfig();
+  const config = getVaultConfig(mode);
   if (!config || config.pin_hash !== hashPin(String(pin))) {
     return res.status(403).json({ error: 'PIN incorrecto' });
   }
 
   try {
-    updateKeyInFile(key, value);
+    updateKeyInFile(key, value, mode);
     res.json({ ok: true, key, masked: maskValue(value) });
   } catch (err) {
     res.status(500).json({ error: err.message });

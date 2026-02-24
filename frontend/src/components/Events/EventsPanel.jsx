@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
 import { getEvents, createEvent, updateEvent, deleteEvent } from '../../api/client';
+import { AgentContext } from '../../context/AgentContext';
 import EventModal from './EventModal';
 import styles from './Events.module.css';
 
@@ -29,6 +30,9 @@ function timeAgo(str) {
 }
 
 export default function EventsPanel() {
+  const { agentName } = useContext(AgentContext);
+  const mode = agentName; // 'CORE' | 'PO'
+
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -37,14 +41,14 @@ export default function EventsPanel() {
   const load = useCallback(async () => {
     try {
       setError(null);
-      const data = await getEvents();
+      const data = await getEvents(mode);
       setEvents(data);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [mode]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -53,7 +57,7 @@ export default function EventsPanel() {
       const updated = await updateEvent(modal.event.id, form);
       setEvents((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
     } else {
-      const created = await createEvent(form);
+      const created = await createEvent(form, mode);
       setEvents((prev) => [created, ...prev]);
     }
     setModal(null);
