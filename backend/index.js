@@ -42,6 +42,18 @@ const frontendDist = process.env.NODE_ENV === 'production'
 
 app.use(express.static(frontendDist));
 
+// ── Devia Model SPA ─────────────────────────────────────────
+// Served from a host volume mounted at /app/devia-model-web
+// React + Vite build output lives in /dist
+const deviaModelPath = '/app/devia-model-web/dist';
+// Static assets first (js, css, etc.) — must come before the wildcard catch-all
+app.use('/deviamodel', express.static(deviaModelPath));
+// SPA fallback — serves index.html for client-side routes (react-router, scroll anchors, etc.)
+app.get(['/deviamodel', '/deviamodel/', '/deviamodel/*'], (req, res) => {
+  res.sendFile(path.join(deviaModelPath, 'index.html'));
+});
+// ────────────────────────────────────────────────────────────
+
 // SPA fallback - serve index.html for non-API routes
 app.get('*', (req, res, next) => {
   if (req.path.startsWith('/api/')) {

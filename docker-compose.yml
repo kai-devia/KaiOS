@@ -14,6 +14,7 @@ services:
       - /home/kai/projects/kai-doc-pwa/data:/app/data:rw
       - /home/kai/.openclaw/agents:/home/kai/.openclaw/agents:ro
       - /home/kai/.kai-secrets:/app/vault-secrets:rw
+      - /home/kai/projects/devia/devia-model-web:/app/devia-model-web:ro
     environment:
       - WORKSPACE_ROOT=/workspace
       - JWT_SECRET=kai-doc-pwa-secret-2026
