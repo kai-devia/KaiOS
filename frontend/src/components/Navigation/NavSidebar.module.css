@@ -15,27 +15,34 @@
   min-width: 70px;
 }
 
-/* Logo section */
+/* ── Logo section ── */
 .logoSection {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid var(--border);
   height: 56px;
+  border-bottom: 1px solid var(--border);
   overflow: hidden;
 }
 
-.logoMark {
+/* K logo button — same size always */
+.logoBtn {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 16px;
-  flex: 1;
-  overflow: hidden;
-  min-width: 0;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 70px;
+  height: 56px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.logoBtn:hover {
+  background: var(--bg-card);
 }
 
 .logo {
-  flex-shrink: 0;
   border-radius: 6px;
 }
 
@@ -44,54 +51,16 @@
   font-size: 0.9rem;
   letter-spacing: 0.05em;
   color: var(--accent);
-  overflow: hidden;
   white-space: nowrap;
+  overflow: hidden;
 }
 
-/* Collapse/expand button */
-.toggleBtn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 56px;
-  background: none;
-  border: none;
-  border-left: 1px solid var(--border);
-  cursor: pointer;
-  color: var(--text-secondary);
-  transition: color var(--transition), background var(--transition);
-  flex-shrink: 0;
-}
-
-.toggleBtn:hover {
-  color: var(--text-primary);
-  background: var(--bg-card);
-}
-
-/* Collapsed: logo centered, toggle full width */
-.sidebar.collapsed .logoSection {
-  justify-content: center;
-}
-
-.sidebar.collapsed .logoMark {
-  display: none;
-}
-
-.sidebar.collapsed .toggleBtn {
+/* Collapsed: logo centered, same width as nav items */
+.sidebar.collapsed .logoBtn {
   width: 70px;
-  border-left: none;
 }
 
-/* Logo + chevron combined when collapsed */
-.collapsedLogoBtn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-/* Mode dropdown */
+/* ── Mode selector ── */
 .modeSection {
   position: relative;
   padding: 8px 12px;
@@ -104,58 +73,27 @@
   justify-content: center;
 }
 
-.modeDropdownTrigger {
-  width: 100%;
+/* No border, no background — just plain text, clickable */
+.modeTrigger {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 6px 10px;
-  background: none;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text-secondary);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
+  justify-content: center;
+  width: 100%;
+  padding: 6px 0;
   cursor: pointer;
-  transition: color var(--transition), background var(--transition), border-color var(--transition);
-}
-
-.modeDropdownTrigger:hover {
-  color: var(--text-primary);
-  border-color: var(--text-secondary);
-  background: var(--bg-card);
+  user-select: none;
 }
 
 .modeLabel {
   color: var(--accent);
-}
-
-.modeChevron {
-  color: var(--text-secondary);
-  transition: transform 0.2s ease;
-  flex-shrink: 0;
-}
-
-.modeChevronOpen {
-  transform: rotate(180deg);
-}
-
-/* Collapsed: small 2-letter badge */
-.modeTagCollapsed {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 26px;
-  border: 1px solid var(--accent);
-  border-radius: 5px;
-  color: var(--accent);
-  font-size: 0.65rem;
+  font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.05em;
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-  cursor: pointer;
+  letter-spacing: 0.08em;
+  transition: opacity var(--transition);
+}
+
+.modeTrigger:hover .modeLabel {
+  opacity: 0.75;
 }
 
 /* Dropdown panel */
@@ -181,14 +119,14 @@
 .modeOption {
   display: block;
   width: 100%;
-  padding: 9px 12px;
+  padding: 9px 0;
   background: none;
   border: none;
   color: var(--text-secondary);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.06em;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
   transition: color var(--transition), background var(--transition);
 }
@@ -203,7 +141,7 @@
   background: color-mix(in srgb, var(--accent) 10%, transparent);
 }
 
-/* Nav items */
+/* ── Nav items ── */
 .nav {
   flex: 1;
   display: flex;
@@ -239,11 +177,19 @@
   border-left-color: var(--accent);
 }
 
+/* Collapsed: center icon */
+.sidebar.collapsed .navItem {
+  padding: 12px 0;
+  justify-content: center;
+  gap: 0;
+}
+
 .icon {
-  font-size: 1.2rem;
   flex-shrink: 0;
   width: 24px;
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   line-height: 1;
 }
 

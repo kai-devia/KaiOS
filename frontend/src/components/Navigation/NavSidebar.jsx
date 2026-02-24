@@ -1,6 +1,6 @@
 import { useContext, useState, useRef, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Monitor, MessageSquare, CheckSquare, Activity, Brain, Lock, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react';
+import { Monitor, MessageSquare, CheckSquare, Activity, Brain, Lock } from 'lucide-react';
 import { AgentContext } from '../../context/AgentContext';
 import styles from './NavSidebar.module.css';
 
@@ -18,7 +18,6 @@ export default function NavSidebar({ collapsed, onToggle }) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(e) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -31,51 +30,31 @@ export default function NavSidebar({ collapsed, onToggle }) {
 
   return (
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
-      {/* Logo section */}
+      {/* Logo section — clicking K always toggles */}
       <div className={styles.logoSection}>
-        {!collapsed && (
-          <div className={styles.logoMark}>
-            <img src="/kai-avatar.svg" alt="KAI" width="28" height="28" className={styles.logo} />
-            <span className={styles.logoText}>Kai</span>
-          </div>
-        )}
-
         <button
-          className={styles.toggleBtn}
+          className={styles.logoBtn}
           onClick={onToggle}
           title={collapsed ? 'Expandir menú' : 'Colapsar menú'}
           aria-label="Toggle navigation"
         >
-          {collapsed ? (
-            <div className={styles.collapsedLogoBtn}>
-              <img src="/kai-avatar.svg" alt="KAI" width="24" height="24" className={styles.logo} />
-              <ChevronRight size={12} />
-            </div>
-          ) : (
-            <ChevronLeft size={16} />
-          )}
+          <img src="/kai-avatar.svg" alt="KAI" width="26" height="26" className={styles.logo} />
         </button>
+        {!collapsed && <span className={styles.logoText}>Kai</span>}
       </div>
 
-      {/* Mode dropdown */}
+      {/* Mode selector — div with onclick, no box */}
       <div
         className={`${styles.modeSection} ${collapsed ? styles.modeSectionCollapsed : ''}`}
         ref={dropdownRef}
       >
-        <button
-          className={styles.modeDropdownTrigger}
+        <div
+          className={styles.modeTrigger}
           onClick={() => setDropdownOpen(o => !o)}
-          title={collapsed ? `Modo: ${agentName}` : undefined}
+          title={`Modo: ${agentName}`}
         >
-          {collapsed ? (
-            <span className={styles.modeTagCollapsed}>{agentName.slice(0, 2)}</span>
-          ) : (
-            <>
-              <span className={styles.modeLabel}>{agentName}</span>
-              <ChevronDown size={14} className={`${styles.modeChevron} ${dropdownOpen ? styles.modeChevronOpen : ''}`} />
-            </>
-          )}
-        </button>
+          <span className={styles.modeLabel}>{agentName}</span>
+        </div>
 
         {dropdownOpen && (
           <div className={`${styles.modeDropdown} ${collapsed ? styles.modeDropdownCollapsed : ''}`}>
