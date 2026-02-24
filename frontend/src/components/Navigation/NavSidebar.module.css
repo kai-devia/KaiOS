@@ -74,9 +74,11 @@
   border-bottom: 1px solid var(--border);
 }
 
-/* Hidden when collapsed — no room, no overflow issues */
-.modeSectionCollapsed {
-  display: none;
+/* Collapsed: less padding, centered */
+.sidebar.collapsed .modeSection {
+  padding: 8px 0;
+  display: flex;
+  justify-content: center;
 }
 
 /* No border, no background — just plain text, clickable */
@@ -102,7 +104,20 @@
   opacity: 0.75;
 }
 
-/* Dropdown panel */
+/* Abbreviated label in collapsed mode (e.g. "CO", "PO") */
+.modeAbbr {
+  color: var(--accent);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  transition: opacity var(--transition);
+}
+
+.modeTrigger:hover .modeAbbr {
+  opacity: 0.75;
+}
+
+/* Dropdown panel — inline (expanded mode) */
 .modeDropdown {
   position: absolute;
   top: calc(100% - 4px);
@@ -116,12 +131,22 @@
   overflow: hidden;
 }
 
-/* modeDropdownCollapsed: not needed — selector hidden in collapsed mode */
+/* Floating dropdown — collapsed mode, escapes overflow:hidden via position:fixed */
+.modeDropdownFixed {
+  position: fixed;
+  min-width: 100px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+  z-index: 1000;
+  overflow: hidden;
+}
 
 .modeOption {
   display: block;
   width: 100%;
-  padding: 9px 0;
+  padding: 9px 16px;
   background: none;
   border: none;
   color: var(--text-secondary);
@@ -131,6 +156,7 @@
   text-align: center;
   cursor: pointer;
   transition: color var(--transition), background var(--transition);
+  white-space: nowrap;
 }
 
 .modeOption:hover {

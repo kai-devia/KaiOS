@@ -16,11 +16,17 @@ const NAV_ITEMS = [
 export default function NavSidebar({ collapsed, onToggle }) {
   const { agentId, agentName, setAgent, agents } = useContext(AgentContext);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
+  const triggerRef = useRef(null);
   const dropdownRef = useRef(null);
 
+  // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(e) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+      if (
+        dropdownRef.current && !dropdownRef.current.contains(e.target) &&
+        triggerRef.current && !triggerRef.current.contains(e.target)
+      ) {
         setDropdownOpen(false);
       }
     }
@@ -28,9 +34,21 @@ export default function NavSidebar({ collapsed, onToggle }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  const handleTriggerClick = () => {
+    if (!dropdownOpen && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect();
+      setDropdownPos({
+        top: rect.top,
+        left: rect.right + 8, // 8px gap to the right of sidebar
+      });
+    }
+    setDropdownOpen(o => !o);
+  };
+
   return (
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
-      {/* Logo section — clicking K always toggles */}
+
+      {/* Logo section — clicking K or Kai always toggles */}
       <div className={styles.logoSection}>
         <button
           className={styles.logoBtn}
@@ -43,21 +61,25 @@ export default function NavSidebar({ collapsed, onToggle }) {
         </button>
       </div>
 
-      {/* Mode selector — div with onclick, no box */}
+      {/* Mode selector */}
       <div
-        className={`${styles.modeSection} ${collapsed ? styles.modeSectionCollapsed : ''}`}
-        ref={dropdownRef}
+        className={styles.modeSection}
+        ref={triggerRef}
       >
         <div
           className={styles.modeTrigger}
-          onClick={() => setDropdownOpen(o => !o)}
+          onClick={handleTriggerClick}
           title={`Modo: ${agentName}`}
         >
-          <span className={styles.modeLabel}>{agentName}</span>
+          {collapsed
+            ? <span className={styles.modeAbbr}>{agentName.slice(0, 2).toUpperCase()}</span>
+            : <span className={styles.modeLabel}>{agentName}</span>
+          }
         </div>
 
-        {dropdownOpen && (
-          <div className={`${styles.modeDropdown} ${collapsed ? styles.modeDropdownCollapsed : ''}`}>
+        {/* Expanded mode: inline dropdown */}
+        {!collapsed && dropdownOpen && (
+          <div className={styles.modeDropdown} ref={dropdownRef}>
             {agents.map((agent) => (
               <button
                 key={agent.id}
@@ -70,6 +92,25 @@ export default function NavSidebar({ collapsed, onToggle }) {
           </div>
         )}
       </div>
+
+      {/* Collapsed mode: floating dropdown via position:fixed */}
+      {collapsed && dropdownOpen && (
+        <div
+          className={styles.modeDropdownFixed}
+          ref={dropdownRef}
+          style={{ top: dropdownPos.top, left: dropdownPos.left }}
+        >
+          {agents.map((agent) => (
+            <button
+              key={agent.id}
+              className={`${styles.modeOption} ${agentId === agent.id ? styles.modeOptionActive : ''}`}
+              onClick={() => { setAgent(agent.id); setDropdownOpen(false); }}
+            >
+              {agent.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <nav className={styles.nav}>
         {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
