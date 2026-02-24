@@ -22,6 +22,9 @@ marked.setOptions({ breaks: true, gfm: true });
 export default function Chat() {
   // ── Agent context ──────────────────────────────────────────────────────
   const { agentId } = useContext(AgentContext);
+  // Ref to always have fresh agentId inside WebSocket callback (avoids stale closure)
+  const agentIdRef = useRef(agentId);
+  useEffect(() => { agentIdRef.current = agentId; }, [agentId]);
   // ── State ──────────────────────────────────────────────────────────────
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -93,7 +96,7 @@ export default function Chat() {
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
-        if (data.type === 'chat_message' && data.message?.id) {
+        if (data.type === 'chat_message' && data.message?.id && data.message.agent_id === agentIdRef.current) {
           const msg = data.message;
 
           if (msg.role === 'user' && pendingTexts.current.has(msg.content)) {
