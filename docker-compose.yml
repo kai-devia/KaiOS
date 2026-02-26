@@ -12,6 +12,7 @@ services:
     volumes:
       - /home/kai/.openclaw/workspace:/workspace:rw
       - /home/kai/.openclaw/workspace-po-kai:/workspace-po-kai:rw
+      - /home/kai/.kai-shared:/home/kai/.kai-shared:ro
       - /home/kai/projects/kai-doc-pwa/data:/app/data:rw
       - /home/kai/.openclaw/agents:/home/kai/.openclaw/agents:ro
       - /home/kai/.kai-secrets:/app/vault-secrets:rw

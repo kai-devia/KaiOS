@@ -1,13 +1,13 @@
-import { createContext, useState, useEffect } from 'react';
+import { createContext, useState, useEffect, useRef, useCallback } from 'react';
 
 export const AgentContext = createContext();
 
-const AGENTS = [
-  { id: 'kai',    name: 'CORE' },
-  { id: 'po-kai', name: 'PO'   },
+const ALL_AGENTS = [
+  { id: 'kai',    name: 'CORE', statusKey: 'core' },
+  { id: 'po-kai', name: 'PO',   statusKey: 'po' },
 ];
 
-// Default accent colors per mode
+// Fallback colors — solo si el backend no responde
 const DEFAULT_COLORS = {
   CORE: '#00d4aa',
   PO:   '#f59e0b',
@@ -18,37 +18,6 @@ function hexToRgb(hex) {
   return result
     ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}`
     : '0, 0, 0';
-}
-
-function hexToHsl(hex) {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) return [0, 0, 0];
-  let r = parseInt(result[1], 16) / 255;
-  let g = parseInt(result[2], 16) / 255;
-  let b = parseInt(result[3], 16) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
-  let h, s, l = (max + min) / 2;
-  if (max === min) {
-    h = s = 0;
-  } else {
-    const d = max - min;
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-    switch (max) {
-      case r: h = ((g - b) / d + (g < b ? 6 : 0)) / 6; break;
-      case g: h = ((b - r) / d + 2) / 6; break;
-      default: h = ((r - g) / d + 4) / 6; break;
-    }
-  }
-  return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
-}
-
-function hslToHex(h, s, l) {
-  s /= 100; l /= 100;
-  const k = n => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
-  const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-  const toHex = x => Math.round(x * 255).toString(16).padStart(2, '0');
-  return `#${toHex(f(0))}${toHex(f(8))}${toHex(f(4))}`;
 }
 
 function darken(hex, amount = 0.15) {
@@ -65,8 +34,6 @@ function applyAccent(hex) {
   root.style.setProperty('--accent', hex);
   root.style.setProperty('--accent-hover', darken(hex));
   root.style.setProperty('--accent-rgb', hexToRgb(hex));
-
-  // Reset backgrounds to neutral — no color tinting on surfaces
   root.style.removeProperty('--bg-base');
   root.style.removeProperty('--bg-surface');
   root.style.removeProperty('--bg-sidebar');
@@ -74,53 +41,101 @@ function applyAccent(hex) {
   root.style.removeProperty('--border');
 }
 
+// Mapeo agentId → nombre de modo
+function agentName(id) {
+  return ALL_AGENTS.find(a => a.id === id)?.name || 'CORE';
+}
+
 export function AgentContextProvider({ children }) {
-  const [agentId, setAgentId] = useState('kai');
-  const [modeColors, setModeColors] = useState(() => {
+  // agentId: siempre desde localStorage (solo identifica qué agente está activo)
+  const [agentId, setAgentId] = useState(() => {
     try {
-      const stored = localStorage.getItem('kai-mode-colors');
-      return stored ? { ...DEFAULT_COLORS, ...JSON.parse(stored) } : { ...DEFAULT_COLORS };
-    } catch {
-      return { ...DEFAULT_COLORS };
-    }
+      const stored = localStorage.getItem('kai-agent-id');
+      if (stored && ALL_AGENTS.some(a => a.id === stored)) return stored;
+    } catch {}
+    return 'kai';
   });
 
-  // Load agent from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem('kai-agent-id');
-    if (stored && AGENTS.some(a => a.id === stored)) {
-      setAgentId(stored);
-    }
+  // Colores: BD es la fuente de verdad. Este estado se puebla desde el backend al arrancar.
+  const [modeColors, setModeColors] = useState(DEFAULT_COLORS);
+  const colorsLoaded = useRef(false);
+
+  // Estado de agentes (online/offline) — centralizado aquí
+  const [agentStatuses, setAgentStatuses] = useState({});
+
+  // Fetch agent statuses
+  const refreshAgentStatuses = useCallback(async () => {
+    try {
+      const res = await fetch('/api/system/agents-status');
+      if (res.ok) {
+        const data = await res.json();
+        setAgentStatuses(data);
+      }
+    } catch {}
   }, []);
 
-  // Apply data-mode + accent color whenever agentId or modeColors change
+  // Initial fetch + periodic refresh
   useEffect(() => {
-    const agent = AGENTS.find(a => a.id === agentId) || AGENTS[0];
-    document.documentElement.setAttribute('data-mode', agent.name);
-    applyAccent(modeColors[agent.name] || DEFAULT_COLORS[agent.name] || '#00d4aa');
+    refreshAgentStatuses();
+    const interval = setInterval(refreshAgentStatuses, 10000);
+    return () => clearInterval(interval);
+  }, [refreshAgentStatuses]);
+
+  // Al arrancar: fetch de colores desde el backend
+  useEffect(() => {
+    async function loadColorsFromBackend() {
+      try {
+        const res = await fetch('/api/system/agent-settings');
+        if (!res.ok) throw new Error('no response');
+        const data = await res.json();
+
+        const colors = { ...DEFAULT_COLORS };
+        if (data && typeof data === 'object' && !Array.isArray(data)) {
+          Object.entries(data).forEach(([key, val]) => {
+            if (val?.color) {
+              const modeName = key.toUpperCase();
+              if (modeName in colors) colors[modeName] = val.color;
+            }
+          });
+        }
+
+        setModeColors(colors);
+        colorsLoaded.current = true;
+      } catch {
+        colorsLoaded.current = true;
+      }
+    }
+
+    loadColorsFromBackend();
+  }, []);
+
+  // Aplicar accent cuando cambia agente o cuando se cargan los colores
+  useEffect(() => {
+    const name = agentName(agentId);
+    document.documentElement.setAttribute('data-mode', name);
+    applyAccent(modeColors[name] || DEFAULT_COLORS[name] || '#00d4aa');
   }, [agentId, modeColors]);
 
+  // Cambiar de agente: aplica color del backend inmediatamente
   const setAgent = (newAgentId) => {
-    if (AGENTS.some(a => a.id === newAgentId)) {
+    if (ALL_AGENTS.some(a => a.id === newAgentId)) {
       setAgentId(newAgentId);
       localStorage.setItem('kai-agent-id', newAgentId);
     }
   };
 
+  // Actualizar color de un modo (llamado desde SISTEMA tras guardar en BD)
   const setModeColor = (modeName, color) => {
-    setModeColors(prev => {
-      const next = { ...prev, [modeName]: color };
-      localStorage.setItem('kai-mode-colors', JSON.stringify(next));
-      return next;
-    });
-    // Apply immediately if it's the active mode — don't wait for useEffect
-    const currentAgent = AGENTS.find(a => a.id === agentId);
-    if (currentAgent && currentAgent.name === modeName) {
-      applyAccent(color);
-    }
+    setModeColors(prev => ({ ...prev, [modeName]: color }));
   };
 
-  const agent = AGENTS.find(a => a.id === agentId) || AGENTS[0];
+  // Solo mostrar agentes que están online
+  const onlineAgents = ALL_AGENTS.filter(agent => {
+    const status = agentStatuses[agent.statusKey];
+    return !status || status.state !== 'offline';
+  });
+
+  const agent = ALL_AGENTS.find(a => a.id === agentId) || ALL_AGENTS[0];
 
   return (
     <AgentContext.Provider
@@ -128,7 +143,10 @@ export function AgentContextProvider({ children }) {
         agentId,
         agentName: agent.name,
         setAgent,
-        agents: AGENTS,
+        agents: onlineAgents,        // Solo agentes online
+        allAgents: ALL_AGENTS,       // Todos los agentes (para Sistema)
+        agentStatuses,               // Estado de cada agente
+        refreshAgentStatuses,        // Función para refrescar estado
         modeColors,
         setModeColor,
       }}

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AgentContext } from '../../context/AgentContext';
 import { getFileContent } from '../../api/client';
 import styles from './FileCard.module.css';
 
@@ -62,11 +63,12 @@ export default function FileCard({ file, basePath = '' }) {
   const [preview, setPreview] = useState('');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { agentId } = useContext(AgentContext);
 
   useEffect(() => {
     let mounted = true;
     
-    getFileContent(file.path)
+    getFileContent(file.path, agentId)
       .then(data => {
         if (mounted) {
           setPreview(getPreview(data.content));
@@ -81,7 +83,7 @@ export default function FileCard({ file, basePath = '' }) {
       });
     
     return () => { mounted = false; };
-  }, [file.path]);
+  }, [file.path, agentId]);
 
   const handleClick = () => {
     navigate(`${basePath}/file/${encodeURIComponent(file.path)}`);

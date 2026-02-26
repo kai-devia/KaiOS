@@ -111,6 +111,36 @@ const alterMigrations = [
     pin_hash   TEXT DEFAULT NULL,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`,
+  // Multi-profile Claude usage (personal, ntasys)
+  `CREATE TABLE IF NOT EXISTS claude_web_limits_profiles (
+    profile              TEXT PRIMARY KEY,
+    session_pct          INTEGER NOT NULL DEFAULT 0,
+    weekly_all_pct       INTEGER NOT NULL DEFAULT 0,
+    weekly_sonnet_pct    INTEGER NOT NULL DEFAULT 0,
+    session_resets_in    TEXT    DEFAULT '',
+    weekly_resets_at     TEXT    DEFAULT '',
+    session_expired      INTEGER DEFAULT 0,
+    session_key          TEXT    DEFAULT NULL,
+    updated_at           TEXT    NOT NULL DEFAULT (datetime('now'))
+  )`,
+  // Budget calculation columns for profiles
+  `ALTER TABLE claude_web_limits_profiles ADD COLUMN weekly_resets_at_iso TEXT DEFAULT NULL`,
+  `ALTER TABLE claude_web_limits_profiles ADD COLUMN weekly_available_pct REAL DEFAULT 0`,
+  `ALTER TABLE claude_web_limits_profiles ADD COLUMN weekly_hours_until_reset REAL DEFAULT 0`,
+  `ALTER TABLE claude_web_limits_profiles ADD COLUMN weekly_daily_budget_pct REAL DEFAULT 0`,
+  // Agent settings: color, future display overrides
+  `CREATE TABLE IF NOT EXISTS agent_settings (
+    agent_id   TEXT PRIMARY KEY,
+    color      TEXT NOT NULL DEFAULT '#00d4aa',
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
+  // Agent runtime status: live | working | offline + optional task description
+  `CREATE TABLE IF NOT EXISTS agent_status (
+    agent_id   TEXT PRIMARY KEY,
+    state      TEXT NOT NULL DEFAULT 'offline',
+    task       TEXT DEFAULT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`,
 ];
 for (const sql of alterMigrations) {
   try { db.exec(sql); } catch { /* column already exists — ignore */ }
@@ -139,3 +169,35 @@ if (eventsCount.count === 0) {
 console.log(`✅ SQLite ready at ${dbPath}`);
 
 module.exports = db;
+
+// ── Agent Capabilities ─────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS agent_capabilities (
+    agent_id TEXT NOT NULL,
+    capability TEXT NOT NULL,
+    enabled INTEGER DEFAULT 1,
+    updated_at TEXT DEFAULT (datetime('now')),
+    PRIMARY KEY (agent_id, capability)
+  )
+`);
+
+// Default capabilities
+const DEFAULT_CAPABILITIES = {
+  core: ['mail', 'jira', 'github'],
+  po:   ['jira'],
+  fe:   ['jira', 'github'],
+  be:   ['jira', 'github'],
+  ux:   ['jira'],
+  qa:   ['jira', 'github'],
+};
+
+// Seed defaults if table is empty
+const count = db.prepare('SELECT COUNT(*) as c FROM agent_capabilities').get();
+if (count.c === 0) {
+  const insert = db.prepare('INSERT OR IGNORE INTO agent_capabilities (agent_id, capability, enabled) VALUES (?, ?, 1)');
+  for (const [agentId, caps] of Object.entries(DEFAULT_CAPABILITIES)) {
+    for (const cap of caps) {
+      insert.run(agentId, cap);
+    }
+  }
+}

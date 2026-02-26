@@ -1,32 +1,11 @@
 import { useContext, useState, useRef, useEffect } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Monitor, MessageSquare, CheckSquare, Activity, Brain, Lock } from 'lucide-react';
 import { AgentContext } from '../../context/AgentContext';
 import styles from './NavSidebar.module.css';
 
-function ColorDot({ color, onChange }) {
-  const inputRef = useRef(null);
-  return (
-    <span
-      className={styles.colorDot}
-      style={{ background: color }}
-      title="Cambiar color del modo"
-      onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
-    >
-      <input
-        ref={inputRef}
-        type="color"
-        value={color}
-        className={styles.colorInput}
-        onChange={(e) => onChange(e.target.value)}
-        onClick={(e) => e.stopPropagation()}
-      />
-    </span>
-  );
-}
-
 const NAV_ITEMS = [
-  { to: '/sistema', icon: Monitor,       label: 'Sistema' },
+  { to: '/sistema', icon: Monitor,       label: 'Sistema', onlyFor: ['CORE'] },
   { to: '/chat',    icon: MessageSquare, label: 'Chat' },
   { to: '/tasks',   icon: CheckSquare,   label: 'Tasks' },
   { to: '/pulse',   icon: Activity,      label: 'Pulse' },
@@ -35,11 +14,36 @@ const NAV_ITEMS = [
 ];
 
 export default function NavSidebar({ collapsed, onToggle }) {
-  const { agentId, agentName, setAgent, agents, modeColors, setModeColor } = useContext(AgentContext);
+  const { agentId, agentName, setAgent, agents } = useContext(AgentContext);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
   const triggerRef = useRef(null);
   const dropdownRef = useRef(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  // Helper to check if current route is allowed for an agent
+  const isRouteAllowedForAgent = (newAgentName) => {
+    const currentPath = location.pathname;
+    const currentItem = NAV_ITEMS.find(item => currentPath.startsWith(item.to));
+    if (!currentItem) return true; // Unknown route, allow
+    if (!currentItem.onlyFor) return true; // No restriction
+    return currentItem.onlyFor.includes(newAgentName);
+  };
+
+  // Handle agent change with redirect logic
+  const handleAgentChange = (newAgentId) => {
+    const newAgent = agents.find(a => a.id === newAgentId);
+    if (!newAgent) return;
+    
+    // Check if current route is allowed for new agent
+    if (!isRouteAllowedForAgent(newAgent.name)) {
+      navigate('/chat');
+    }
+    
+    setAgent(newAgentId);
+    setDropdownOpen(false);
+  };
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -105,13 +109,9 @@ export default function NavSidebar({ collapsed, onToggle }) {
               <div
                 key={agent.id}
                 className={`${styles.modeOption} ${agentId === agent.id ? styles.modeOptionActive : ''}`}
-                onClick={() => { setAgent(agent.id); setDropdownOpen(false); }}
+                onClick={() => handleAgentChange(agent.id)}
               >
                 <span className={styles.modeOptionLabel}>{agent.name}</span>
-                <ColorDot
-                  color={modeColors[agent.name] || '#00d4aa'}
-                  onChange={(color) => setModeColor(agent.name, color)}
-                />
               </div>
             ))}
           </div>
@@ -129,20 +129,18 @@ export default function NavSidebar({ collapsed, onToggle }) {
             <div
               key={agent.id}
               className={`${styles.modeOption} ${agentId === agent.id ? styles.modeOptionActive : ''}`}
-              onClick={() => { setAgent(agent.id); setDropdownOpen(false); }}
+              onClick={() => handleAgentChange(agent.id)}
             >
               <span className={styles.modeOptionLabel}>{agent.name}</span>
-              <ColorDot
-                color={modeColors[agent.name] || '#00d4aa'}
-                onChange={(color) => setModeColor(agent.name, color)}
-              />
             </div>
           ))}
         </div>
       )}
 
       <nav className={styles.nav}>
-        {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+        {NAV_ITEMS
+          .filter(({ onlyFor }) => !onlyFor || onlyFor.includes(agentName))
+          .map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}

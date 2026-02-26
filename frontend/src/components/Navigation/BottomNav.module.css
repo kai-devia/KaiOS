@@ -5,31 +5,63 @@
 @media (max-width: 768px) {
   .bottomNav {
     display: flex;
+    align-items: center;
+    justify-content: center;
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    height: 64px;
+    height: 56px;
     background: var(--bg-sidebar);
     border-top: 1px solid var(--border);
     z-index: 100;
+    padding: 0 16px;
     /* Safe area for iOS notch */
     padding-bottom: env(safe-area-inset-bottom, 0);
   }
 
-  .tab {
-    flex: 1;
+  /* Selector de agentes - centrado */
+  .modeSelector {
     display: flex;
-    flex-direction: column;
+    gap: 12px;
+  }
+
+  .modeBtn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all var(--transition);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .modeBtn:hover {
+    color: var(--text-primary);
+  }
+
+  .modeBtnActive {
+    color: var(--mode-color, var(--accent));
+    border-color: var(--mode-color, var(--accent));
+    background: rgba(0, 212, 170, 0.1);
+  }
+
+  /* Chat tab - right side */
+  .tab {
+    display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 3px;
+    gap: 6px;
     color: var(--text-secondary);
     text-decoration: none;
-    font-size: 0.65rem;
+    font-size: 0.8rem;
     font-weight: 500;
     transition: color var(--transition);
-    padding: 8px 4px;
+    padding: 8px 12px;
+    border-radius: 8px;
   }
 
   .tab:hover {
@@ -38,17 +70,20 @@
 
   .tab.active {
     color: var(--accent);
+    background: rgba(0, 212, 170, 0.1);
   }
 
   .icon {
-    font-size: 1.35rem;
+    font-size: 1.2rem;
     line-height: 1;
   }
 
   .label {
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 72px;
   }
+}
+
+.modeBtn.offline {
+  opacity: 0.3;
+  cursor: not-allowed;
 }

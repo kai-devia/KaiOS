@@ -53,14 +53,17 @@ function getCpu() {
   }
 }
 
-// ── Disk: usar el volumen montado /workspace (apunta al host) ─────────────
+// ── Disk: usar /workspace (Docker) o /home/kai (PM2/host) ─────────────────
 function getDiskUsage() {
   try {
     const physicalGb = parseInt(process.env.PHYSICAL_DISK_GB || '0', 10);
 
+    // Detect environment: /workspace exists in Docker, otherwise use home or root
+    const diskPath = fs.existsSync('/workspace') ? '/workspace' : (process.env.HOME || '/');
+
     // BusyBox-compatible: df -B1 -P (POSIX)
     // Columns: Filesystem, 1-blocks(total), Used, Available, Capacity%, Mountpoint
-    const raw = execSync('df -B1 -P /workspace', { timeout: 5000 })
+    const raw = execSync(`df -B1 -P "${diskPath}"`, { timeout: 5000 })
       .toString().split('\n');
     const parts    = raw[1].trim().split(/\s+/);
     const usedBytes  = parseInt(parts[2], 10);
@@ -72,7 +75,8 @@ function getDiskUsage() {
     const percent = totalGb > 0 ? Math.round((usedGb / totalGb) * 100) : 0;
 
     return { used: usedGb, total: totalGb, free: freeGb, percent };
-  } catch {
+  } catch (err) {
+    console.error('[disk] getDiskUsage error:', err.message);
     return { used: 0, total: 0, free: 0, percent: 0 };
   }
 }
@@ -238,15 +242,46 @@ router.get('/subagents', (req, res) => {
   res.json({ count: 0 });
 });
 
-// ── claude.ai manual limits ────────────────────────────────────────────────
+// ── claude.ai manual limits (multi-profile) ────────────────────────────────
+const CLAUDE_PROFILES = ['personal', 'ntasys'];
+
 router.get('/claude-web-limits', (req, res) => {
   try {
-    const row = db.prepare(
+    // Return all profiles with budget calculations
+    const profiles = {};
+    for (const profile of CLAUDE_PROFILES) {
+      const row = db.prepare(`
+        SELECT session_pct, weekly_all_pct, weekly_sonnet_pct, session_resets_in, weekly_resets_at,
+               weekly_resets_at_iso, weekly_available_pct, weekly_hours_until_reset, weekly_daily_budget_pct,
+               updated_at, session_expired
+        FROM claude_web_limits_profiles WHERE profile = ?
+      `).get(profile);
+      profiles[profile] = row || {
+        session_pct: 0, weekly_all_pct: 0, weekly_sonnet_pct: 0,
+        session_resets_in: '', weekly_resets_at: '', 
+        weekly_resets_at_iso: null, weekly_available_pct: 100, weekly_hours_until_reset: 0, weekly_daily_budget_pct: 0,
+        updated_at: null, session_expired: 0,
+      };
+    }
+    
+    // Calculate recommended profile (the one with more daily budget)
+    const personalBudget = profiles.personal?.weekly_daily_budget_pct || 0;
+    const ntasysBudget = profiles.ntasys?.weekly_daily_budget_pct || 0;
+    const recommended = personalBudget >= ntasysBudget ? 'personal' : 'ntasys';
+    
+    // Also return legacy single-profile for backwards compat
+    const legacy = db.prepare(
       'SELECT session_pct, weekly_all_pct, weekly_sonnet_pct, session_resets_in, weekly_resets_at, updated_at, session_expired FROM claude_web_limits WHERE id = 1'
     ).get();
-    res.json(row || {
-      session_pct: 0, weekly_all_pct: 0, weekly_sonnet_pct: 0,
-      session_resets_in: '', weekly_resets_at: '', updated_at: null, session_expired: 0,
+    
+    res.json({
+      profiles,
+      recommended,
+      // Legacy fields (backwards compat)
+      ...(legacy || {
+        session_pct: 0, weekly_all_pct: 0, weekly_sonnet_pct: 0,
+        session_resets_in: '', weekly_resets_at: '', updated_at: null, session_expired: 0,
+      }),
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -255,12 +290,48 @@ router.get('/claude-web-limits', (req, res) => {
 
 router.patch('/claude-web-limits', (req, res) => {
   try {
-    const { session_pct, weekly_all_pct, weekly_sonnet_pct, session_resets_in, weekly_resets_at } = req.body;
+    const { 
+      profile, session_pct, weekly_all_pct, weekly_sonnet_pct, session_resets_in, weekly_resets_at,
+      weekly_resets_at_iso, weekly_available_pct, weekly_hours_until_reset, weekly_daily_budget_pct
+    } = req.body;
+    
+    // If profile is specified, update that specific profile
+    if (profile && CLAUDE_PROFILES.includes(profile)) {
+      db.prepare(`
+        INSERT INTO claude_web_limits_profiles
+          (profile, session_pct, weekly_all_pct, weekly_sonnet_pct, session_resets_in, weekly_resets_at,
+           weekly_resets_at_iso, weekly_available_pct, weekly_hours_until_reset, weekly_daily_budget_pct, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+        ON CONFLICT(profile) DO UPDATE SET
+          session_pct               = excluded.session_pct,
+          weekly_all_pct            = excluded.weekly_all_pct,
+          weekly_sonnet_pct         = excluded.weekly_sonnet_pct,
+          session_resets_in         = excluded.session_resets_in,
+          weekly_resets_at          = excluded.weekly_resets_at,
+          weekly_resets_at_iso      = excluded.weekly_resets_at_iso,
+          weekly_available_pct      = excluded.weekly_available_pct,
+          weekly_hours_until_reset  = excluded.weekly_hours_until_reset,
+          weekly_daily_budget_pct   = excluded.weekly_daily_budget_pct,
+          updated_at                = excluded.updated_at
+      `).run(
+        profile,
+        session_pct               ?? 0,
+        weekly_all_pct            ?? 0,
+        weekly_sonnet_pct         ?? 0,
+        session_resets_in         || '',
+        weekly_resets_at          || '',
+        weekly_resets_at_iso      || null,
+        weekly_available_pct      ?? 0,
+        weekly_hours_until_reset  ?? 0,
+        weekly_daily_budget_pct   ?? 0,
+      );
+      
+      return res.json({ ok: true, profile });
+    }
 
-    // Auto-calibrate weekly token limit when weekly_all_pct is provided
+    // Legacy: update single-profile table + auto-calibrate
     let estimated_weekly_limit = null;
     if (weekly_all_pct > 0) {
-      // Sum all tracked tokens so far as the "tokens at X%" reference point
       const row = db.prepare(`
         SELECT SUM(input_tokens) + SUM(output_tokens) as total
         FROM claude_daily_usage
@@ -304,7 +375,7 @@ router.patch('/claude-web-limits', (req, res) => {
 // ── Manual sync trigger → calls host sync-bridge ─────────────────────────
 router.post('/sync-claude', async (req, res) => {
   try {
-    const bridgeUrl = 'http://172.19.0.1:8766/sync';
+    const bridgeUrl = `${BRIDGE_URL}/sync`;
     const response = await fetch(bridgeUrl, {
       method: 'POST',
       headers: { 'x-sync-secret': 'kai-sync-secret-2026' },
@@ -355,7 +426,7 @@ router.post('/claude-session-key', async (req, res) => {
 
     // Trigger sync via bridge
     try {
-      const bridgeRes = await fetch('http://172.19.0.1:8766/sync', {
+      const bridgeRes = await fetch(`${BRIDGE_URL}/sync`, {
         method: 'POST',
         headers: { 'x-sync-secret': 'kai-sync-secret-2026' },
       });
@@ -384,6 +455,409 @@ router.get('/claude-usage', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ── Auth profile management (via host bridge) ─────────────────────────────
+// PM2 runs on host, so bridge is localhost. Docker would use 172.19.0.1
+const BRIDGE_URL = process.env.BRIDGE_URL || 'http://127.0.0.1:8766';
+const BRIDGE_SECRET = 'kai-sync-secret-2026';
+
+router.get('/auth-profile', async (req, res) => {
+  try {
+    const response = await fetch(`${BRIDGE_URL}/auth-profile`, {
+      method: 'GET',
+      headers: { 'x-sync-secret': BRIDGE_SECRET },
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      return res.status(502).json({ error: `Bridge error: ${text}` });
+    }
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(503).json({ error: `Cannot reach bridge: ${err.message}` });
+  }
+});
+
+router.post('/auth-profile', async (req, res) => {
+  const { profile } = req.body;
+  try {
+    const response = await fetch(`${BRIDGE_URL}/auth-profile`, {
+      method: 'POST',
+      headers: {
+        'x-sync-secret': BRIDGE_SECRET,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ profile }),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      return res.status(502).json({ error: `Bridge error: ${text}` });
+    }
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(503).json({ error: `Cannot reach bridge: ${err.message}` });
+  }
+});
+
+// ── Agent settings (color, etc.) ───────────────────────────────────────────
+
+const AGENT_DEFAULTS = {
+  core: '#00d4aa',
+  po:   '#f59e0b',
+  fe:   '#3b82f6',
+  be:   '#8b5cf6',
+  ux:   '#ec4899',
+  qa:   '#10b981',
+};
+
+router.get('/agent-settings', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT agent_id, color FROM agent_settings').all();
+    const settings = {};
+    // Seed defaults for any missing agent
+    for (const [agentId, defaultColor] of Object.entries(AGENT_DEFAULTS)) {
+      const row = rows.find(r => r.agent_id === agentId);
+      settings[agentId] = { color: row?.color || defaultColor };
+    }
+    res.json(settings);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.patch('/agent-settings/:agentId', (req, res) => {
+  const { agentId } = req.params;
+  const { color } = req.body;
+
+  if (!agentId || !AGENT_DEFAULTS[agentId]) {
+    return res.status(400).json({ error: 'agentId inválido' });
+  }
+  if (!color || !/^#[0-9a-fA-F]{3,8}$/.test(color)) {
+    return res.status(400).json({ error: 'color inválido' });
+  }
+
+  try {
+    db.prepare(`
+      INSERT INTO agent_settings (agent_id, color, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(agent_id) DO UPDATE SET
+        color      = excluded.color,
+        updated_at = excluded.updated_at
+    `).run(agentId, color);
+    res.json({ ok: true, agentId, color });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Agent status (self-reported by agents + force-reset + restart) ─────────
+
+const AGENT_STATUS_DEFAULTS = {
+  core: 'live',
+  po:   'live',
+  fe:   'offline',
+  be:   'offline',
+  ux:   'offline',
+  qa:   'offline',
+};
+
+// Mapeo de agentId a nombre de contenedor Docker
+const AGENT_CONTAINERS = {
+  core: 'agent-core',
+  po:   'agent-po',
+  // fe, be, ux, qa se añadirán cuando existan
+};
+
+// Verificar estado real de un contenedor Docker
+function getDockerContainerState(containerName) {
+  try {
+    const result = execSync(
+      `docker inspect --format='{{.State.Status}}' ${containerName} 2>/dev/null`,
+      { timeout: 5000 }
+    ).toString().trim();
+    // Docker states: running, paused, exited, dead, etc.
+    if (result === 'running') return 'live';
+    if (result === 'paused') return 'paused';
+    return 'offline';
+  } catch {
+    return 'offline';
+  }
+}
+
+// GET /api/system/agents-status
+router.get('/agents-status', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT agent_id, state, task, updated_at FROM agent_status').all();
+    const result = {};
+    for (const [agentId, defaultState] of Object.entries(AGENT_STATUS_DEFAULTS)) {
+      const row = rows.find(r => r.agent_id === agentId);
+      
+      // Para agentes con contenedor Docker, verificar estado real
+      let realState = row?.state || defaultState;
+      if (AGENT_CONTAINERS[agentId]) {
+        realState = getDockerContainerState(AGENT_CONTAINERS[agentId]);
+      }
+      
+      result[agentId] = {
+        state:      realState,
+        task:       row?.task       || null,
+        updated_at: row?.updated_at || null,
+        hasContainer: !!AGENT_CONTAINERS[agentId],
+      };
+    }
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/system/agents-status/:agentId
+// Agents self-report their state. No auth required (internal only).
+router.put('/agents-status/:agentId', (req, res) => {
+  const { agentId } = req.params;
+  const { state, task } = req.body;
+
+  if (!Object.hasOwn(AGENT_STATUS_DEFAULTS, agentId)) {
+    return res.status(400).json({ error: 'agentId inválido' });
+  }
+  if (!['live', 'working', 'offline'].includes(state)) {
+    return res.status(400).json({ error: 'state debe ser: live | working | offline' });
+  }
+
+  try {
+    db.prepare(`
+      INSERT INTO agent_status (agent_id, state, task, updated_at)
+      VALUES (?, ?, ?, datetime('now'))
+      ON CONFLICT(agent_id) DO UPDATE SET
+        state      = excluded.state,
+        task       = excluded.task,
+        updated_at = excluded.updated_at
+    `).run(agentId, state, task || null);
+    res.json({ ok: true, agentId, state, task: task || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/system/agents-control/:agentId/:action
+// Control Docker containers: start, stop, restart, pause, unpause
+router.post('/agents-control/:agentId/:action', (req, res) => {
+  const { agentId, action } = req.params;
+  
+  const containerName = AGENT_CONTAINERS[agentId];
+  if (!containerName) {
+    return res.status(400).json({ error: `Agent '${agentId}' no tiene contenedor Docker asociado` });
+  }
+  
+  const validActions = ['start', 'stop', 'restart', 'pause', 'unpause'];
+  if (!validActions.includes(action)) {
+    return res.status(400).json({ error: `Acción inválida. Usar: ${validActions.join(', ')}` });
+  }
+  
+  try {
+    execSync(`docker ${action} ${containerName}`, { timeout: 30000 });
+    const newState = getDockerContainerState(containerName);
+    
+    // Actualizar DB con el nuevo estado
+    const dbState = newState === 'live' ? 'live' : 'offline';
+    db.prepare(`
+      INSERT INTO agent_status (agent_id, state, task, updated_at)
+      VALUES (?, ?, NULL, datetime('now'))
+      ON CONFLICT(agent_id) DO UPDATE SET
+        state      = excluded.state,
+        task       = NULL,
+        updated_at = datetime('now')
+    `).run(agentId, dbState);
+    
+    res.json({ ok: true, agentId, action, state: newState });
+  } catch (err) {
+    res.status(500).json({ error: `Docker ${action} failed: ${err.message}` });
+  }
+});
+
+// POST /api/system/agents-force-reset/:agentId
+// Force an agent's status back to 'live' — clears stuck 'working' states.
+router.post('/agents-force-reset/:agentId', (req, res) => {
+  const { agentId } = req.params;
+
+  if (!Object.hasOwn(AGENT_STATUS_DEFAULTS, agentId)) {
+    return res.status(400).json({ error: 'agentId inválido' });
+  }
+
+  try {
+    db.prepare(`
+      INSERT INTO agent_status (agent_id, state, task, updated_at)
+      VALUES (?, 'live', NULL, datetime('now'))
+      ON CONFLICT(agent_id) DO UPDATE SET
+        state      = 'live',
+        task       = NULL,
+        updated_at = datetime('now')
+    `).run(agentId);
+    res.json({ ok: true, agentId, state: 'live' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/system/agents-restart
+// Restart the OpenClaw gateway via bridge (affects all agents).
+router.post('/agents-restart', async (req, res) => {
+  try {
+    const response = await fetch(`${BRIDGE_URL}/restart-gateway`, {
+      method: 'POST',
+      headers: { 'x-sync-secret': BRIDGE_SECRET },
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      return res.status(502).json({ error: `Bridge error: ${text}` });
+    }
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(503).json({ error: `Cannot reach bridge: ${err.message}` });
+  }
+});
+
+// ── Agent model management ─────────────────────────────────────────────────
+
+router.get('/agent-models', async (req, res) => {
+  try {
+    const response = await fetch(`${BRIDGE_URL}/agent-models`, {
+      method: 'GET',
+      headers: { 'x-sync-secret': BRIDGE_SECRET },
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      return res.status(502).json({ error: `Bridge error: ${text}` });
+    }
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(503).json({ error: `Cannot reach bridge: ${err.message}` });
+  }
+});
+
+router.post('/agent-models', async (req, res) => {
+  const { agentId, model } = req.body;
+  try {
+    const response = await fetch(`${BRIDGE_URL}/agent-models`, {
+      method: 'POST',
+      headers: {
+        'x-sync-secret': BRIDGE_SECRET,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ agentId, model }),
+    });
+    if (!response.ok) {
+      const text = await response.text();
+      return res.status(502).json({ error: `Bridge error: ${text}` });
+    }
+    const data = await response.json();
+    res.json(data);
+  } catch (err) {
+    res.status(503).json({ error: `Cannot reach bridge: ${err.message}` });
+  }
+});
+
+// ── Agent Capabilities (permissions) ───────────────────────────────────────
+
+const ALL_CAPABILITIES = ['mail', 'jira', 'github'];
+const CAPABILITY_INFO = {
+  mail:   { name: 'Email', icon: 'Mail' },
+  jira:   { name: 'Jira', icon: 'Ticket' },
+  github: { name: 'GitHub', icon: 'Github' },
+};
+
+// GET /api/system/agent-capabilities
+router.get('/agent-capabilities', (req, res) => {
+  try {
+    const rows = db.prepare('SELECT agent_id, capability, enabled FROM agent_capabilities').all();
+    
+    // Build response grouped by agent
+    const result = {};
+    for (const agentId of Object.keys(AGENT_STATUS_DEFAULTS)) {
+      result[agentId] = {};
+      for (const cap of ALL_CAPABILITIES) {
+        result[agentId][cap] = false; // default off
+      }
+    }
+    
+    // Apply DB values
+    for (const row of rows) {
+      if (result[row.agent_id]) {
+        result[row.agent_id][row.capability] = Boolean(row.enabled);
+      }
+    }
+    
+    res.json({
+      capabilities: result,
+      available: ALL_CAPABILITIES,
+      info: CAPABILITY_INFO,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// PUT /api/system/agent-capabilities/:agentId/:capability
+router.put('/agent-capabilities/:agentId/:capability', (req, res) => {
+  const { agentId, capability } = req.params;
+  const { enabled } = req.body;
+  
+  if (!Object.hasOwn(AGENT_STATUS_DEFAULTS, agentId)) {
+    return res.status(400).json({ error: 'agentId inválido' });
+  }
+  if (!ALL_CAPABILITIES.includes(capability)) {
+    return res.status(400).json({ error: `capability inválida. Usar: ${ALL_CAPABILITIES.join(', ')}` });
+  }
+  
+  try {
+    db.prepare(`
+      INSERT INTO agent_capabilities (agent_id, capability, enabled, updated_at)
+      VALUES (?, ?, ?, datetime('now'))
+      ON CONFLICT(agent_id, capability) DO UPDATE SET
+        enabled    = excluded.enabled,
+        updated_at = excluded.updated_at
+    `).run(agentId, capability, enabled ? 1 : 0);
+    
+    res.json({ ok: true, agentId, capability, enabled: Boolean(enabled) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/system/capability-action
+// Execute an action (email, jira comment, etc.) — checks permissions first
+router.post('/capability-action', (req, res) => {
+  const { agentId, capability, action, payload } = req.body;
+  
+  if (!agentId || !capability || !action) {
+    return res.status(400).json({ error: 'agentId, capability, and action required' });
+  }
+  
+  // Check permission
+  const row = db.prepare(
+    'SELECT enabled FROM agent_capabilities WHERE agent_id = ? AND capability = ?'
+  ).get(agentId, capability);
+  
+  if (!row || !row.enabled) {
+    return res.status(403).json({ 
+      error: `Agent '${agentId}' no tiene permiso para '${capability}'`,
+      code: 'PERMISSION_DENIED'
+    });
+  }
+  
+  // TODO: Execute the actual action based on capability + action + payload
+  // For now, just return success (implementation pending)
+  res.json({ 
+    ok: true, 
+    agentId, 
+    capability, 
+    action,
+    message: 'Action permitted (execution not yet implemented)'
+  });
 });
 
 module.exports = router;

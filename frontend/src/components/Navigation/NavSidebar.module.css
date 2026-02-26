@@ -272,3 +272,17 @@
     display: none;
   }
 }
+
+.modeOptionOffline {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.modeOptionOffline:hover {
+  background: transparent;
+}
+
+.offlineIcon {
+  color: #666;
+  margin-left: auto;
+}

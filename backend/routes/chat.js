@@ -17,7 +17,20 @@ const upload = multer({
 // Desde Docker, el host es accesible via la gateway de la red Docker
 // 172.19.0.1 = host desde kai-network; fallback a HOST_GATEWAY env var
 const OPENCLAW_HOST = process.env.OPENCLAW_GATEWAY_HOST || '172.19.0.1';
-const OPENCLAW_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN;
+
+// Puertos, agentIds y tokens por modo
+const AGENT_CONFIG = {
+  'kai':    { 
+    port: parseInt(process.env.OPENCLAW_CORE_PORT || '18791'), 
+    agentId: 'core',
+    token: process.env.OPENCLAW_CORE_TOKEN || process.env.OPENCLAW_GATEWAY_TOKEN
+  },
+  'po-kai': { 
+    port: parseInt(process.env.OPENCLAW_PO_PORT || '18790'), 
+    agentId: 'po',
+    token: process.env.OPENCLAW_PO_TOKEN || process.env.OPENCLAW_GATEWAY_TOKEN
+  },
+};
 const SESSION_USER   = 'kai-doc-pwa'; // stable session key via OpenClaw user field
 const WHISPER_HOST = process.env.WHISPER_HOST || '172.19.0.1';
 const WHISPER_PORT = process.env.WHISPER_PORT || 9876;
@@ -121,18 +134,21 @@ async function streamToOpenClaw(message, res, history = [], sessionUser = SESSIO
     stream: true,
   });
 
-  // Determine which agent ID to use in OpenClaw request
-  const openclawAgentId = agentId === 'po-kai' ? 'po-kai' : 'pwa';
+  // Determine which agent ID, port, and token to use in OpenClaw request
+  const agentCfg = AGENT_CONFIG[agentId] || AGENT_CONFIG['kai'];
+  const openclawAgentId = agentCfg.agentId;
+  const openclawPort    = agentCfg.port;
+  const openclawToken   = agentCfg.token;
 
   const options = {
     hostname: OPENCLAW_HOST,
-    port: 18789,
+    port: openclawPort,
     path: '/v1/chat/completions',
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(body),
-      'Authorization': `Bearer ${OPENCLAW_TOKEN}`,
+      'Authorization': `Bearer ${openclawToken}`,
       'x-openclaw-agent-id': openclawAgentId,
     },
   };
@@ -447,14 +463,14 @@ async function streamWithContent(userContent, res, history = []) {
 
   const options = {
     hostname: OPENCLAW_HOST,
-    port: 18789,
+    port: AGENT_CONFIG['kai'].port,
     path: '/v1/chat/completions',
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(body),
-      'Authorization': `Bearer ${OPENCLAW_TOKEN}`,
-      'x-openclaw-agent-id': 'pwa',
+      'Authorization': `Bearer ${AGENT_CONFIG['kai'].token}`,
+      'x-openclaw-agent-id': AGENT_CONFIG['kai'].agentId,
     },
   };
 

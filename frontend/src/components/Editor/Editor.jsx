@@ -6,8 +6,8 @@ import styles from './Editor.module.css';
 export default function Editor() {
   const { '*': filePath } = useParams();
   const navigate = useNavigate();
-  const { success, error: showError, basePath = '' } = useOutletContext();
-  const { content, loading, error, saving, save } = useFileContent(filePath);
+  const { success, error: showError, basePath = '', agentId } = useOutletContext();
+  const { content, loading, error, saving, save } = useFileContent(filePath, agentId);
   const [editedContent, setEditedContent] = useState('');
   const [hasChanges, setHasChanges] = useState(false);
 

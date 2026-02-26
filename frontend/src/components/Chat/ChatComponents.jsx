@@ -3,9 +3,9 @@ import { marked } from 'marked';
 import styles from './Chat.module.css';
 import { localImageCache } from './imageCache';
 
-export const TypingIndicator = memo(() => (
+export const TypingIndicator = memo(({ agentCode = 'CO' }) => (
   <div className={`${styles.msgRow} ${styles.msgRowAssistant}`}>
-    <div className={styles.avatar}>K</div>
+    <div className={styles.avatar}>{agentCode}</div>
     <div className={`${styles.bubble} ${styles.bubbleAssistant}`}>
       <div className={styles.typing}>
         <span /><span /><span />
@@ -16,7 +16,7 @@ export const TypingIndicator = memo(() => (
 
 TypingIndicator.displayName = 'TypingIndicator';
 
-export const Message = memo(({ msg, isStreaming }) => {
+export const Message = memo(({ msg, isStreaming, agentCode = 'CO' }) => {
   const isUser = msg.role === 'user';
   const hasImage = isUser && msg.content?.startsWith('[Imagen]');
   const imageUrl = hasImage ? localImageCache.get(msg.id) : null;
@@ -24,7 +24,7 @@ export const Message = memo(({ msg, isStreaming }) => {
 
   return (
     <div className={`${styles.msgRow} ${isUser ? styles.msgRowUser : styles.msgRowAssistant}`}>
-      {!isUser && <div className={styles.avatar}>K</div>}
+      {!isUser && <div className={styles.avatar}>{agentCode}</div>}
       <div className={`${styles.bubble} ${isUser ? styles.bubbleUser : styles.bubbleAssistant}`}>
         <div className={styles.bubbleText}>
           {isUser ? (

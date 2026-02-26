@@ -68,3 +68,18 @@
   color: #7c6af7;
   flex-shrink: 0;
 }
+
+.agentItem.offline {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.agentItem.offline:hover {
+  background: transparent;
+  color: #666;
+}
+
+.offlineIcon {
+  color: #666;
+  flex-shrink: 0;
+}

@@ -21,7 +21,9 @@ marked.setOptions({ breaks: true, gfm: true });
 
 export default function Chat() {
   // ── Agent context ──────────────────────────────────────────────────────
-  const { agentId } = useContext(AgentContext);
+  const { agentId, agentName } = useContext(AgentContext);
+  // Agent code: CORE→CO, PO→PO, etc.
+  const agentCode = agentName === 'CORE' ? 'CO' : agentName?.slice(0, 2).toUpperCase() || 'CO';
   // Ref to always have fresh agentId inside WebSocket callback (avoids stale closure)
   const agentIdRef = useRef(agentId);
   useEffect(() => { agentIdRef.current = agentId; }, [agentId]);
@@ -478,10 +480,10 @@ export default function Chat() {
         )}
 
         {messages.map((msg) => (
-          <Message key={msg.id} msg={msg} />
+          <Message key={msg.id} msg={msg} agentCode={agentCode} />
         ))}
 
-        {streaming && !streamText && <TypingIndicator />}
+        {streaming && !streamText && <TypingIndicator agentCode={agentCode} />}
         {streaming && streamText && (
           <Message
             msg={{
@@ -490,6 +492,7 @@ export default function Chat() {
               created_at: null,
             }}
             isStreaming
+            agentCode={agentCode}
           />
         )}
 
