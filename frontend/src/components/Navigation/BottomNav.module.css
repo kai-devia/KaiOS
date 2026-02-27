@@ -6,38 +6,52 @@
   .bottomNav {
     display: flex;
     align-items: center;
-    justify-content: center;
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    height: 56px;
+    height: 52px;
     background: var(--bg-sidebar);
     border-top: 1px solid var(--border);
     z-index: 100;
-    padding: 0 16px;
-    /* Safe area for iOS notch */
+    padding: 0;
     padding-bottom: env(safe-area-inset-bottom, 0);
+    overflow: hidden;
   }
 
-  /* Selector de agentes - centrado */
+  /* Selector de agentes - scroll horizontal */
   .modeSelector {
     display: flex;
-    gap: 12px;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding: 0 12px;
+    width: 100%;
+    align-items: center;
+  }
+
+  .modeSelector::-webkit-scrollbar {
+    display: none;
   }
 
   .modeBtn {
+    flex-shrink: 0;
+    scroll-snap-align: start;
     background: transparent;
     border: 1px solid transparent;
     border-radius: 6px;
-    padding: 6px 12px;
-    font-size: 0.75rem;
+    padding: 5px 10px;
+    font-size: 0.7rem;
     font-weight: 600;
     color: var(--text-secondary);
     cursor: pointer;
     transition: all var(--transition);
     text-transform: uppercase;
     letter-spacing: 0.5px;
+    white-space: nowrap;
   }
 
   .modeBtn:hover {
@@ -47,7 +61,7 @@
   .modeBtnActive {
     color: var(--mode-color, var(--accent));
     border-color: var(--mode-color, var(--accent));
-    background: rgba(0, 212, 170, 0.1);
+    background: color-mix(in srgb, var(--mode-color, var(--accent)) 12%, transparent);
   }
 
   /* Chat tab - right side */
