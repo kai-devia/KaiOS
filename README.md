@@ -1,4 +1,4 @@
-# 🧠 KAI DOC PWA
+# KAI-PWA
 
 Una ventana a la mente de Kai — visor y editor de archivos markdown de contexto y memoria.
 

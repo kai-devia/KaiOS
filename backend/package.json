@@ -1,5 +1,5 @@
 {
-  "name": "kai-doc-pwa-backend",
+  "name": "kai-pwa-backend",
   "version": "1.0.0",
   "description": "Backend for KAI DOC PWA",
   "main": "index.js",

@@ -3,9 +3,9 @@ networks:
     name: kai-network
 
 services:
-  kai-doc-pwa:
+  kai-pwa:
     build: .
-    container_name: kai-doc-pwa
+    container_name: kai-pwa
     restart: unless-stopped
     ports:
       - "80:3001"
@@ -17,7 +17,7 @@ services:
       - /home/kai/.instances/ux/workspace:/workspace-ux-kai:rw
       - /home/kai/.instances/qa/workspace:/workspace-qa-kai:rw
       - /home/kai/.kai-shared:/home/kai/.kai-shared:ro
-      - /home/kai/projects/kai-doc-pwa/data:/app/data:rw
+      - /home/kai/projects/KAI-PWA/data:/app/data:rw
       - /home/kai/.openclaw/agents:/home/kai/.openclaw/agents:ro
       - /home/kai/.kai-secrets:/app/vault-secrets:rw
       - /home/kai/projects/devia-model-web:/app/devia-model-web:ro
@@ -28,7 +28,7 @@ services:
       - WORKSPACE_BE_KAI=/workspace-be-kai
       - WORKSPACE_UX_KAI=/workspace-ux-kai
       - WORKSPACE_QA_KAI=/workspace-qa-kai
-      - JWT_SECRET=kai-doc-pwa-secret-2026
+      - JWT_SECRET=kai-pwa-secret-2026
       - PORT=3001
       - TELEGRAM_BOT_TOKEN=8291237173:AAElzKvQHvIjVQZ8Pm2yaBFdoXB9aiRKqik
       - TELEGRAM_CHAT_ID=8314284665
