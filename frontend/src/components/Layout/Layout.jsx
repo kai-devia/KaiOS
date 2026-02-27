@@ -3,7 +3,6 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { AgentContext } from '../../context/AgentContext';
 import Header from './Header/Header';
 import NavSidebar from '../Navigation/NavSidebar';
-import BottomNav from '../Navigation/BottomNav';
 import { useFiles } from '../../hooks/useFiles';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { useToast } from '../../hooks/useToast';
@@ -84,9 +83,6 @@ export default function Layout() {
           />
         </main>
       </div>
-
-      {/* Mobile bottom navigation */}
-      <BottomNav />
 
       {/* Toast container */}
       <div className="toast-container">
