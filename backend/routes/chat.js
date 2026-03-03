@@ -567,5 +567,52 @@ async function streamWithContent(userContent, res, history = []) {
   });
 }
 
+// ── POST /api/chat/abort — Para el agente via chat.abort WebSocket ────────
+// Envía chat.abort al Gateway de OpenClaw via WS para detener el run activo.
+// El AbortController del frontend solo corta el stream HTTP desde el cliente;
+// esto garantiza que OpenClaw deja de procesar y ejecutar tools en el servidor.
+router.post('/abort', async (req, res) => {
+  const { agentId } = req.body;
+  const agent = agentId || 'kai';
+  const agentCfg = AGENT_CONFIG[agent] || AGENT_CONFIG['kai'];
+  const wsUrl = `ws://${OPENCLAW_HOST}:${agentCfg.port}/`;
+  const token = agentCfg.token;
+
+  const WebSocket = require('ws');
+  const ws = new WebSocket(wsUrl, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    handshakeTimeout: 5000,
+  });
+
+  let settled = false;
+
+  const done = (ok, msg) => {
+    if (settled) return;
+    settled = true;
+    try { ws.close(); } catch {}
+    if (ok) {
+      console.log(`[chat/abort] Sent chat.abort to ${agent} (${wsUrl})`);
+      res.json({ ok: true, agent });
+    } else {
+      console.warn(`[chat/abort] Failed for ${agent}: ${msg}`);
+      res.status(502).json({ ok: false, error: msg });
+    }
+  };
+
+  ws.on('open', () => {
+    try {
+      ws.send(JSON.stringify({ type: 'chat.abort', sessionKey: SESSION_USER }));
+      done(true);
+    } catch (err) {
+      done(false, err.message);
+    }
+  });
+
+  ws.on('error', (err) => done(false, err.message));
+
+  // Timeout de seguridad
+  setTimeout(() => done(false, 'WS connect timeout'), 6000);
+});
+
 module.exports = router;
 module.exports.streamToOpenClaw = streamToOpenClaw;

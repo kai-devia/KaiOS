@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useContext } from 'react';
-import { ImagePlus, X } from 'lucide-react';
+import { ImagePlus, X, Square } from 'lucide-react';
 import { getToken } from '../../api/client';
 import { AgentContext } from '../../context/AgentContext';
 import { marked } from 'marked';
@@ -76,6 +76,28 @@ export default function Chat() {
     cancelRecording,
     clearAudioBlob,
   } = useAudioRecorder();
+
+  // ── Abort: para el agente en el servidor via chat.abort WS ──────────────
+  const handleAbort = useCallback(async () => {
+    // 1) Cortar el stream HTTP desde el cliente
+    abortSSE();
+    setStreaming(false);
+    setStreamText('');
+    // 2) Decirle a OpenClaw que deje de procesar (chat.abort via WS)
+    try {
+      const token = getToken();
+      await fetch(`${API_BASE}/chat/abort`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ agentId: agentIdRef.current }),
+      });
+    } catch {
+      // Silencioso — el abort del cliente ya paró el stream visible
+    }
+  }, [abortSSE]);
 
   // ── Effects ────────────────────────────────────────────────────────────
 
@@ -555,23 +577,37 @@ export default function Chat() {
             </button>
           )}
 
-          {/* Send / Audio buttons */}
-          {hasImage || hasText ? (
-            <SendButton
-              pending={pending}
-              disabled={streaming}
-              onClick={hasImage ? sendImageMessage : sendMessage}
-            />
-          ) : (
-            <AudioButton
-              isRecording={isRecording}
-              recordingTime={recordingTime}
-              hasAudio={!!audioBlob}
-              onStartRecord={startRecording}
-              onStopRecord={stopRecording}
-              onCancelRecord={cancelRecording}
-              onSendAudio={sendAudio}
-            />
+          {/* Stop button — visible solo mientras el agente está generando */}
+          {streaming && (
+            <button
+              className={styles.stopBtn}
+              onClick={handleAbort}
+              title="Parar agente"
+              aria-label="Parar"
+            >
+              <Square size={16} strokeWidth={2} fill="currentColor" />
+            </button>
+          )}
+
+          {/* Send / Audio buttons — ocultos mientras streaming (Stop button los reemplaza) */}
+          {!streaming && (
+            hasImage || hasText ? (
+              <SendButton
+                pending={pending}
+                disabled={false}
+                onClick={hasImage ? sendImageMessage : sendMessage}
+              />
+            ) : (
+              <AudioButton
+                isRecording={isRecording}
+                recordingTime={recordingTime}
+                hasAudio={!!audioBlob}
+                onStartRecord={startRecording}
+                onStopRecord={stopRecording}
+                onCancelRecord={cancelRecording}
+                onSendAudio={sendAudio}
+              />
+            )
           )}
         </div>
       </div>
